@@ -1,0 +1,160 @@
+{
+  "_note": "FICTIONAL SAMPLE IEP - FOR TESTING ONLY - NOT A REAL STUDENT",
+  "meta": {
+    "eligibility": "Autism",
+    "school": "Mesa Ridge High School (fictional)",
+    "case_manager": "Mr. T. Nguyen, Special Education Teacher"
+  },
+  "student_name": "Jordan Ellis",
+  "dob": "06/02/2012",
+  "school_year": "2026-2027",
+  "grade": "9",
+  "iep_from": "10/02/2026",
+  "iep_to": "10/01/2027",
+  "profile": {
+    "strengths": "Jordan has an excellent memory and is very accurate with facts. He follows written rules well, reads at grade level, and has a strong interest in engineering and trains. He works carefully and checks his work when given a checklist.",
+    "parent_concerns": "Parents want Jordan to make at least one friend at school and to handle changes at home and school with less stress. They also want him to start thinking about a career in engineering.",
+    "preferences_interests": "Jordan enjoys trains, building models, and robotics. He prefers to work alone and in quiet places. In his student interview he said he wants to 'design trains' and go to college. He does not like loud cafeterias or surprise schedule changes.",
+    "evaluation_results": "Re-evaluation (September 2026): cognitive ability in the average range with a strength in visual reasoning. Math problem solving is below grade level (40% accuracy on multi-step word problems). Speech-language evaluation shows needs in social communication: starting conversations, taking turns, and understanding others' feelings.",
+    "needs": "Jordan's autism affects his ability to work in groups, start and keep conversations with peers, and cope with unexpected changes. When the schedule changes without warning, he sometimes leaves the classroom (about 2 times per month). He needs support to solve multi-step math word problems.",
+    "other": "",
+    "ei_transition_justification": ""
+  },
+  "special_factors": {
+    "behavior_impedes": true,
+    "bip": false,
+    "limited_english": false,
+    "braille": false,
+    "communication": true,
+    "assistive_tech": false,
+    "specially_designed_pe": false,
+    "alternate_assessment": false,
+    "transition_services": true
+  },
+  "transportation": {
+    "mode": "Regular bus",
+    "mode_other": "",
+    "related_service": false,
+    "transport_rep_involved": false,
+    "needs": ["Preferential seating"],
+    "needs_details": "Seat near the front of the bus, away from loud groups."
+  },
+  "nonacademic": {"participation": "YES, with supports", "description": "Jordan may join the robotics club with a peer mentor and a written schedule of club activities."},
+  "progress_report_weeks": "9",
+  "transition": {
+    "applicable": true,
+    "student_invited_date": "09/15/2026",
+    "student_invited_via": "Written invitation",
+    "agencies_invited": false,
+    "addressed_on_goal_page": true,
+    "assessments": ["Student Interview", "Parent Interview", "Interest Inventory"],
+    "assessment_other": "",
+    "postsecondary": {
+      "education": {"assessments": [{"name": "Student Interview", "date": "09/15/2026"}, {"name": "Interest Inventory", "date": "09/18/2026"}], "long_term_goal": "After graduation, Jordan will attend a 4-year university and study mechanical engineering.", "other": ""},
+      "employment": {"assessments": [{"name": "Interest Inventory", "date": "09/18/2026"}, {"name": "Parent Interview", "date": "09/20/2026"}], "long_term_goal": "After completing college, Jordan will work as an engineer in the transportation industry.", "other": ""},
+      "independent_living": {"assessments": [{"name": "Parent Interview", "date": "09/20/2026"}, {"name": "", "date": ""}], "long_term_goal": "After graduation, Jordan will use public transportation independently and manage his own daily schedule.", "other": ""}
+    },
+    "middle_school_course": false,
+    "exit_month": "May",
+    "exit_year": "2030",
+    "pathway": "General Education Pathway",
+    "credits": {
+      "General Education Pathway": {"english": "1", "math": "1", "science": "1", "social_studies": "1"},
+      "Essentials Pathway": {"english": "", "math": "", "science": "", "social_studies": ""},
+      "Alternate Achievement Standards Pathway": {"english": "", "math": "", "science": "", "social_studies": ""}
+    },
+    "electives": "2"
+  },
+  "transition_goals": {
+    "present_level": "Jordan wants to study engineering. On the interest inventory his top areas were engineering and technology. He has not yet explored college programs or what engineers do day to day. He relies on his parents to plan his schedule.",
+    "education": {"goal": "Jordan will research 3 college engineering programs and list their admission requirements.", "mastery_date": "05/2027", "services": "Postsecondary Education (PE)", "activities": ["Meet with school counselor to review 4-year course plan.", "Complete online research on 3 engineering programs with teacher support."], "people": "Case manager, school counselor"},
+    "employment": {"goal": "Jordan will complete a job-shadowing day with an engineer and write a one-page reflection.", "mastery_date": "05/2027", "services": "Community Experiences (CE), Employment Development (ED)", "activities": ["Prepare 5 questions to ask during the job shadow.", "Practice a short introduction with the speech-language pathologist."], "people": "Case manager, speech-language pathologist, parent"},
+    "independent_living": {"goal": "Jordan will use a phone calendar to plan his own weekly schedule with 90% accuracy for 4 consecutive weeks.", "mastery_date": "05/2027", "services": "Personal Management (PM)", "activities": ["Set up a phone calendar with the case manager.", "Review the calendar with a parent every Sunday."], "people": "Case manager, parent"}
+  },
+  "goals": [
+    {
+      "area": "Math – Problem Solving",
+      "present_level": "Jordan solves one-step equations with 80% accuracy but solves multi-step word problems with about 40% accuracy. He benefits from worked examples.",
+      "goal": "Using a problem-solving checklist, Jordan will solve two-step word problems with 80% accuracy on 4 of 5 biweekly probes.",
+      "mastery_date": "10/01/2027",
+      "evaluation": ["Curriculum Based Assessment", "Work Samples"],
+      "evaluation_other": "",
+      "benchmarks": [
+        {"text": "Jordan will solve two-step word problems with 60% accuracy using a checklist.", "date": "01/15/2027"},
+        {"text": "Jordan will solve two-step word problems with 70% accuracy using a checklist.", "date": "04/15/2027"}
+      ]
+    },
+    {
+      "area": "Communication – Social Communication",
+      "present_level": "Jordan starts a conversation with a peer about 1 time per week, usually about trains. He has difficulty taking turns in conversation.",
+      "goal": "Jordan will start and keep a conversation with a peer for at least 3 exchanges, 3 times per week, across 4 consecutive weeks.",
+      "mastery_date": "10/01/2027",
+      "evaluation": ["Teacher Observation", "Data Collection"],
+      "evaluation_other": "",
+      "benchmarks": [
+        {"text": "Jordan will start a conversation with a peer 2 times per week with a visual prompt.", "date": "01/15/2027"},
+        {"text": "Jordan will keep a conversation for 3 exchanges 2 times per week.", "date": "04/15/2027"}
+      ]
+    },
+    {
+      "area": "Behavior – Coping with Change",
+      "present_level": "When the schedule changes without warning, Jordan leaves the classroom about 2 times per month.",
+      "goal": "When told about a schedule change, Jordan will use a coping strategy from his card (break pass, deep breathing, or visual schedule check) and stay in the classroom in 90% of recorded instances.",
+      "mastery_date": "10/01/2027",
+      "evaluation": ["Data Collection", "Teacher Observation"],
+      "evaluation_other": "",
+      "benchmarks": [
+        {"text": "Jordan will use a coping strategy with one adult prompt in 70% of instances.", "date": "01/15/2027"},
+        {"text": "Jordan will use a coping strategy independently in 80% of instances.", "date": "04/15/2027"}
+      ]
+    }
+  ],
+  "services": {
+    "special_education": {"needed": true, "rows": [
+      {"service": "Specialized math instruction", "frequency": "Daily (5 days/week)", "amount": "50 minutes", "begin": "10/02/2026", "end": "10/01/2027", "location": "Special education resource room"}
+    ]},
+    "related_services": {"needed": true, "rows": [
+      {"service": "Speech-language therapy (social communication)", "frequency": "2 times per week", "amount": "30 minutes", "begin": "10/02/2026", "end": "10/01/2027", "location": "Speech room, small group"},
+      {"service": "Counseling – social skills group", "frequency": "Weekly", "amount": "30 minutes", "begin": "10/02/2026", "end": "10/01/2027", "location": "Counselor's office"}
+    ]},
+    "supplementary_aids": {"needed": true, "rows": [
+      {"service": "Visual daily schedule with advance warning of changes", "frequency": "Daily", "amount": "All day", "begin": "10/02/2026", "end": "10/01/2027", "location": "All classrooms"},
+      {"service": "Break pass (up to 2 per class, 5 minutes each)", "frequency": "Daily", "amount": "As needed", "begin": "10/02/2026", "end": "10/01/2027", "location": "All classrooms"},
+      {"service": "Noise-reducing headphones during independent work", "frequency": "Daily", "amount": "As needed", "begin": "10/02/2026", "end": "10/01/2027", "location": "All classrooms"},
+      {"service": "Written directions in addition to spoken directions", "frequency": "Daily", "amount": "All assignments", "begin": "10/02/2026", "end": "10/01/2027", "location": "All classrooms"},
+      {"service": "Assigned roles during group work", "frequency": "During group work", "amount": "As needed", "begin": "10/02/2026", "end": "10/01/2027", "location": "General education classroom"}
+    ]},
+    "program_modifications": {"needed": false, "rows": []},
+    "assessment_accommodations": {"needed": true, "rows": [
+      {"service": "Separate, quiet testing setting", "frequency": "All tests", "amount": "Entire test", "begin": "10/02/2026", "end": "10/01/2027", "location": "Testing room"},
+      {"service": "Noise-reducing headphones", "frequency": "All tests", "amount": "Entire test", "begin": "10/02/2026", "end": "10/01/2027", "location": "Testing room"},
+      {"service": "Breaks as needed", "frequency": "All tests", "amount": "As needed", "begin": "10/02/2026", "end": "10/01/2027", "location": "Testing room"}
+    ]},
+    "assistive_technology": {"needed": false, "rows": []},
+    "support_for_personnel": {"needed": true, "rows": [
+      {"service": "Autism training for general education teachers", "frequency": "Once per semester", "amount": "1 hour", "begin": "10/02/2026", "end": "10/01/2027", "location": "School"}
+    ]}
+  },
+  "transfer_of_rights_date": "",
+  "esy_considered": true,
+  "lre": {
+    "attends_home_school": true, "home_school_explain": "",
+    "all_with_nondisabled": false,
+    "nondisabled_explain": "Jordan receives specialized math instruction in the resource room and speech-language therapy in a small group because he needs explicit, small-group instruction in multi-step problem solving and social communication.",
+    "age_group": "6-21",
+    "setting": "Inside the regular class 80% or more of the day"
+  },
+  "copies": {"iep_given": true, "iep_sent_date": "", "rights_given": true, "rights_sent_date": "", "amended_sent_date": ""},
+  "participants": [
+    {"position": "Parent", "name": "Chris Ellis (fictional)", "date": "10/02/2026"},
+    {"position": "Parent", "name": "Sam Ellis (fictional)", "date": "10/02/2026"},
+    {"position": "General Education Teacher", "name": "Ms. J. Rivera (fictional)", "date": "10/02/2026"},
+    {"position": "Special Education Teacher", "name": "Mr. T. Nguyen (fictional)", "date": "10/02/2026"},
+    {"position": "LEA Representative", "name": "Ms. P. Owens (fictional)", "date": "10/02/2026"},
+    {"position": "Someone Who Can Interpret the Instructional Implications of the Evaluation Results", "name": "Dr. M. Ahmed, School Psychologist (fictional)", "date": "10/02/2026"},
+    {"position": "Student", "name": "Jordan Ellis", "date": "10/02/2026"},
+    {"position": "Career/Technical Education Representative", "name": "", "date": ""},
+    {"position": "Other Agency Representative", "name": "", "date": ""}
+  ],
+  "not_in_attendance": []
+}

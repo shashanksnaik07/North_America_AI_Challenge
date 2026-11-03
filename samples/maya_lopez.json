@@ -1,0 +1,129 @@
+{
+  "_note": "FICTIONAL SAMPLE IEP - FOR TESTING ONLY - NOT A REAL STUDENT",
+  "meta": {
+    "eligibility": "Specific Learning Disability (Reading); Other Health Impairment (ADHD)",
+    "school": "Desert View Elementary (fictional)",
+    "case_manager": "Ms. R. Carter, Special Education Teacher"
+  },
+  "student_name": "Maya Lopez",
+  "dob": "03/14/2017",
+  "school_year": "2026-2027",
+  "grade": "4",
+  "iep_from": "09/10/2026",
+  "iep_to": "09/09/2027",
+  "profile": {
+    "strengths": "Maya has a strong oral vocabulary and contributes well to class discussions. She is creative, enjoys science experiments, and works well in small groups. Math computation is at grade level. She responds well to praise and to visual checklists.",
+    "parent_concerns": "Parents want Maya to gain confidence in reading and to read independently at home. They report homework takes over an hour each night.",
+    "preferences_interests": "Maya likes science, drawing, and animals. She prefers hands-on activities and working with a partner. She says reading out loud in front of the class makes her nervous.",
+    "evaluation_results": "Re-evaluation (August 2026): reading fluency and decoding are well below grade level (62 words correct per minute on grade 4 passages; benchmark is about 94). Listening comprehension is in the average range, which shows she understands text when it is read to her. Attention rating scales from teacher and parent show difficulty staying on task during independent work.",
+    "needs": "Maya's reading disability affects all subjects that require independent reading, including word problems in math and science texts. She struggles to decode multisyllabic words and vowel teams. Her attention difficulties mean she stays on task for about 8 to 10 minutes during independent work before needing a prompt.",
+    "other": "Maya takes ADHD medication at home in the morning (per parent report).",
+    "ei_transition_justification": ""
+  },
+  "special_factors": {
+    "behavior_impedes": false,
+    "bip": false,
+    "limited_english": false,
+    "braille": false,
+    "communication": false,
+    "assistive_tech": true,
+    "specially_designed_pe": false,
+    "alternate_assessment": false,
+    "transition_services": false
+  },
+  "transportation": {
+    "mode": "Regular bus",
+    "mode_other": "",
+    "related_service": false,
+    "transport_rep_involved": false,
+    "needs": [],
+    "needs_details": ""
+  },
+  "nonacademic": {"participation": "YES", "description": ""},
+  "progress_report_weeks": "9",
+  "transition": {"applicable": false},
+  "goals": [
+    {
+      "area": "Reading – Fluency",
+      "present_level": "Maya reads 62 words correct per minute (WCPM) on grade 4 passages with 88% accuracy. The grade-level benchmark is about 94 WCPM. Slow reading makes it hard for her to finish grade-level reading assignments in class.",
+      "goal": "Given a grade 4 passage, Maya will read 90 words correct per minute with 95% accuracy in 3 of 4 weekly probes.",
+      "mastery_date": "09/09/2027",
+      "evaluation": ["Curriculum Based Assessment", "Data Collection"],
+      "evaluation_other": "",
+      "benchmarks": [
+        {"text": "Maya will read 72 WCPM with 92% accuracy on grade 4 passages.", "date": "12/18/2026"},
+        {"text": "Maya will read 82 WCPM with 94% accuracy on grade 4 passages.", "date": "03/12/2027"}
+      ]
+    },
+    {
+      "area": "Reading – Decoding",
+      "present_level": "Maya decodes CVC words accurately but reads multisyllabic words with vowel teams with 50% accuracy.",
+      "goal": "Maya will correctly decode multisyllabic words with vowel teams with 85% accuracy across 3 consecutive sessions.",
+      "mastery_date": "09/09/2027",
+      "evaluation": ["Data Collection", "Work Samples"],
+      "evaluation_other": "",
+      "benchmarks": [
+        {"text": "Maya will decode two-syllable words with vowel teams with 70% accuracy.", "date": "12/18/2026"},
+        {"text": "Maya will decode two- and three-syllable words with vowel teams with 80% accuracy.", "date": "03/12/2027"}
+      ]
+    },
+    {
+      "area": "Functional – Task Completion",
+      "present_level": "Maya stays on task for 8 to 10 minutes during independent work before needing an adult prompt.",
+      "goal": "Using a visual checklist, Maya will complete 15-minute independent work tasks with no more than 1 adult prompt in 4 of 5 observed sessions.",
+      "mastery_date": "09/09/2027",
+      "evaluation": ["Teacher Observation", "Data Collection"],
+      "evaluation_other": "",
+      "benchmarks": [
+        {"text": "Maya will complete 10-minute tasks with no more than 2 prompts in 4 of 5 sessions.", "date": "12/18/2026"},
+        {"text": "Maya will complete 12-minute tasks with no more than 1 prompt in 4 of 5 sessions.", "date": "03/12/2027"}
+      ]
+    }
+  ],
+  "services": {
+    "special_education": {"needed": true, "rows": [
+      {"service": "Specialized reading instruction", "frequency": "Daily (5 days/week)", "amount": "45 minutes", "begin": "09/10/2026", "end": "09/09/2027", "location": "Special education resource room"}
+    ]},
+    "related_services": {"needed": false, "rows": []},
+    "supplementary_aids": {"needed": true, "rows": [
+      {"service": "Extended time (1.5x) on assignments", "frequency": "Daily", "amount": "As needed", "begin": "09/10/2026", "end": "09/09/2027", "location": "General education classroom"},
+      {"service": "Preferential seating near instruction, away from doors", "frequency": "Daily", "amount": "All day", "begin": "09/10/2026", "end": "09/09/2027", "location": "All classrooms"},
+      {"service": "Visual checklist for multi-step tasks", "frequency": "Daily", "amount": "As needed", "begin": "09/10/2026", "end": "09/09/2027", "location": "All classrooms"},
+      {"service": "Movement breaks", "frequency": "Every 20 minutes", "amount": "2-3 minutes", "begin": "09/10/2026", "end": "09/09/2027", "location": "All classrooms"}
+    ]},
+    "program_modifications": {"needed": false, "rows": []},
+    "assessment_accommodations": {"needed": true, "rows": [
+      {"service": "Extended time (1.5x) on tests", "frequency": "All tests", "amount": "1.5x standard time", "begin": "09/10/2026", "end": "09/09/2027", "location": "Testing setting"},
+      {"service": "Read-aloud / text-to-speech for math, science and social studies tests (not reading tests)", "frequency": "Content-area tests", "amount": "Entire test", "begin": "09/10/2026", "end": "09/09/2027", "location": "Small group setting"},
+      {"service": "Small group testing", "frequency": "All tests", "amount": "Entire test", "begin": "09/10/2026", "end": "09/09/2027", "location": "Special education resource room"}
+    ]},
+    "assistive_technology": {"needed": true, "rows": [
+      {"service": "Text-to-speech software on school laptop", "frequency": "Daily", "amount": "As needed", "begin": "09/10/2026", "end": "09/09/2027", "location": "All classrooms"}
+    ]},
+    "support_for_personnel": {"needed": true, "rows": [
+      {"service": "Consultation between special education and general education teacher", "frequency": "Monthly", "amount": "30 minutes", "begin": "09/10/2026", "end": "09/09/2027", "location": "School"}
+    ]}
+  },
+  "transfer_of_rights_date": "",
+  "esy_considered": true,
+  "lre": {
+    "attends_home_school": true, "home_school_explain": "",
+    "all_with_nondisabled": false,
+    "nondisabled_explain": "Maya receives 45 minutes per day of specialized reading instruction in the resource room because she needs intensive, small-group decoding and fluency instruction that cannot be provided during whole-class instruction.",
+    "age_group": "6-21",
+    "setting": "Inside the regular class 80% or more of the day"
+  },
+  "copies": {"iep_given": true, "iep_sent_date": "", "rights_given": true, "rights_sent_date": "", "amended_sent_date": ""},
+  "participants": [
+    {"position": "Parent", "name": "Ana Lopez (fictional)", "date": "09/10/2026"},
+    {"position": "Parent", "name": "", "date": ""},
+    {"position": "General Education Teacher", "name": "Mr. D. Patel (fictional)", "date": "09/10/2026"},
+    {"position": "Special Education Teacher", "name": "Ms. R. Carter (fictional)", "date": "09/10/2026"},
+    {"position": "LEA Representative", "name": "Dr. K. Brooks (fictional)", "date": "09/10/2026"},
+    {"position": "Someone Who Can Interpret the Instructional Implications of the Evaluation Results", "name": "Ms. L. Grant, School Psychologist (fictional)", "date": "09/10/2026"},
+    {"position": "Student", "name": "", "date": ""},
+    {"position": "Career/Technical Education Representative", "name": "", "date": ""},
+    {"position": "Other Agency Representative", "name": "", "date": ""}
+  ],
+  "not_in_attendance": []
+}

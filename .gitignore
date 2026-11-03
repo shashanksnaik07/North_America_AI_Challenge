@@ -1,0 +1,16 @@
+# Student data, database and downloaded dataset - never upload these
+data/
+
+# Python environments and cache
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Mac / editor files
+.DS_Store
+.vscode/
+.idea/
+
+# Uploaded or exported IEPs - keep real student files off GitHub
+*.pdf
