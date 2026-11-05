@@ -1,0 +1,44 @@
+/* Local, system-font UI. No remote fonts or assets. */
+.block-container {max-width:1540px; padding:1.5rem 2rem 3rem;}
+[data-testid="stHeader"] {height:1rem; background:transparent;}
+h1 {font-size:1.6rem!important; letter-spacing:-.035em; padding:0!important;}
+h2 {font-size:1.35rem!important; letter-spacing:-.025em;}
+h3 {font-size:1.12rem!important; padding-top:.25rem!important;}
+p {line-height:1.55;}
+[data-testid="stCaptionContainer"] {color:#526578;}
+button, input, textarea, [role="combobox"] {border-radius:8px!important;}
+button:focus-visible, input:focus-visible, textarea:focus-visible {outline:3px solid #2087b7!important; outline-offset:3px!important;}
+[data-testid="stBaseButton-secondary"], [data-testid="stBaseButton-primary"] {min-height:42px;}
+[data-baseweb="tab-list"] {gap:2rem; border-bottom:1px solid #d9e1eb;}
+[data-baseweb="tab"] {font-weight:600; padding:0 0 .8rem;}
+[data-baseweb="tab-highlight"] {background:#245A81; height:3px;}
+[data-testid="stVerticalBlockBorderWrapper"] {border-radius:12px!important;}
+[data-testid="stExpander"] {background:transparent;}
+.app-eyebrow {font-size:.7rem; font-weight:700; letter-spacing:.12em; color:#567187; margin-bottom:.2rem; text-transform:uppercase;}
+.student-title {font-size:1.55rem; font-weight:700; letter-spacing:-.035em; margin:0;}
+.student-meta {font-size:.88rem; color:#526578; margin:.25rem 0 .4rem;}
+.status-pill {display:inline-block; border-radius:20px; padding:.25rem .65rem; font-size:.75rem; font-weight:600; color:#2f5672; background:#e7eff6;}
+.plan-fact {padding:.5rem 0; border-bottom:1px solid #e9eef4;}
+.plan-fact small {display:block; color:#526578; margin-bottom:.1rem; font-size:.76rem;}
+.plan-fact strong {font-weight:600; font-size:.92rem;}
+.st-key-inspector {background:white; border:1px solid #d9e1eb; border-radius:12px; padding:1.1rem;}
+:is(.st-key-document-layout,.st-key-document-layout-read) > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {align-items:flex-start; gap:1.25rem;}
+:is(.st-key-document-layout,.st-key-document-layout-read) > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {min-width:320px;}
+.st-key-document-layout [data-testid="stMarkdownContainer"] p {overflow-wrap:anywhere;}
+.st-key-workspace-tasks {padding:.25rem 0 .5rem;}
+.st-key-student-header {padding:.2rem 0 .6rem;}
+.st-key-caseload-list [data-testid="stBaseButton-tertiary"] {color:#245A81; font-weight:600;}
+.st-key-caseload-list [data-testid="stBaseButton-tertiary"]:hover {text-decoration:underline;}
+@media(max-width:1100px) {
+  .block-container {padding:1.2rem 1rem 2rem;}
+  :is(.st-key-document-layout,.st-key-document-layout-read) > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {flex-direction:column-reverse;}
+  :is(.st-key-document-layout,.st-key-document-layout-read) > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] > [data-testid="stColumn"] {width:100%!important; flex:1 1 auto!important; min-width:0!important;}
+  .st-key-inspector {padding:1rem;}
+}
+@media(max-width:520px) {
+  .block-container {padding:1rem .75rem 2rem;}
+  h1 {font-size:1.3rem!important;}
+  [data-baseweb="tab-list"] {gap:1rem;}
+}
+
+@media(max-width:1100px) { .st-key-document-layout-read > [data-testid="stLayoutWrapper"] > [data-testid="stHorizontalBlock"] {flex-direction:column;} }

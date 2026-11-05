@@ -51,7 +51,8 @@ def rows_editor(rows: list[dict], columns: list[str], key: str) -> list[dict]:
 
 def save_form(new_iep: dict, section: str, sid: str, teacher: str) -> None:
     if run_safely(reviews.stage_change, sid, new_iep, f"Form edit: {section}", teacher):
-        flash(f"Submitted for review: {section}")
+        flash(f"Saved for review: {section}")
+        st.session_state['pending_tool_'+sid]='Review'
         st.rerun()
 
 
@@ -67,21 +68,22 @@ def ask(student_id, teacher=""):
     hist_key = f"chat_{sid}"
     st.session_state.setdefault(hist_key, [])
     ai_key = f"ai_qs_{sid}"
-    st.markdown("**Suggested questions**")
+    st.caption("Ask a question about this plan and its supporting files.")
     clicked = None
-    qcols = st.columns(2)
-    for i, q in enumerate(st.session_state.get(ai_key) or core.suggested_questions(sid)):
-        if qcols[i % 2].button(q, key=f"q_{sid}_{i}", width="stretch"):
-            clicked = q
-    if st.button("✨ Suggest questions with AI", key=f"aiq_{sid}"):
-        with st.spinner("Reading the IEP..."):
-            qs = run_safely(core.ai_questions, sid)
-        if qs:
-            st.session_state[ai_key] = qs
-            st.rerun()
+    with st.expander('Ideas for questions'):
+        qcols = [st.container(), st.container()]
+        for i, q in enumerate(st.session_state.get(ai_key) or core.suggested_questions(sid)):
+            if qcols[i % 2].button(q, key=f"q_{sid}_{i}", width="stretch"):
+                clicked = q
+        if st.button("✨ Suggest questions with AI", key=f"aiq_{sid}"):
+            with st.spinner("Reading the IEP..."):
+                qs = run_safely(core.ai_questions, sid)
+            if qs:
+                st.session_state[ai_key] = qs
+                st.rerun()
     with st.form(f"ask_{sid}", clear_on_submit=True):
-        typed = st.text_input(f"Or ask your own question about {first}")
-        if st.form_submit_button("Ask") and typed.strip():
+        typed = st.text_area("Your question", placeholder=f"What supports help {first} with independent work?", height=100)
+        if st.form_submit_button("Ask about this plan", type="primary") and typed.strip():
             clicked = typed.strip()
     if clicked:
         with st.spinner("Reading the IEP..."):
@@ -126,10 +128,10 @@ def updates(student_id, teacher=""):
     sug_key = f'suggestions_{sid}'
     st.session_state.setdefault(sug_key, [])
     save_form = partial(globals()['save_form'], sid=sid, teacher=teacher)
-    st.info("Draft changes from observations, supporting documents and connected course reports. Submit a suggestion to Review to compare the original PDF and form differences before approval.")
+    st.caption("Describe an observation. We’ll use it with the student’s files and course reports to draft a change for your review.")
     note = st.text_area("What have you noticed about this student?",
                         placeholder=f"e.g. {first} met the first reading benchmark and gets overwhelmed by long worksheets.")
-    if st.button("Get suggestions", type="primary", disabled=not note.strip()):
+    if st.button("Draft suggestions", type="primary", disabled=not note.strip()):
         with st.spinner("Drafting suggestions..."):
             new = run_safely(core.suggest_updates, sid, note.strip()) or []
         st.session_state[sug_key] = new + st.session_state[sug_key]
@@ -139,9 +141,9 @@ def updates(student_id, teacher=""):
         with st.container(border=True):
             st.markdown(f"**{s['section']}**  ·  _source: {s.get('source', '?')}_")
             c1, c2 = st.container(), st.container()
-            c1.markdown("**Now on the form**")
+            c1.markdown("**Current wording**")
             c1.write(s.get("current_text") or "(empty)")
-            c2.markdown("**Suggested** (edit before approving if needed)")
+            c2.markdown("**Suggested wording**")
             edited = c2.text_area("Suggested", s["suggested_text"], key=f"edit_{sid}_{i}_{len(st.session_state[sug_key])}",
                                   label_visibility="collapsed")
             if s["action"] == "add_service":
@@ -157,6 +159,7 @@ def updates(student_id, teacher=""):
                 if msg:
                     st.session_state[sug_key].pop(i)
                     flash(msg)
+                    st.session_state['pending_tool_'+sid]='Review'
                     st.rerun()
             if r_.button("❌ Reject", key=f"no_{sid}_{i}"):
                 core.log_decision(sid, s, "rejected", teacher)
@@ -173,17 +176,19 @@ def form(student_id, teacher=""):
     sug_key = f'suggestions_{sid}'
     st.session_state.setdefault(sug_key, [])
     save_form = partial(globals()['save_form'], sid=sid, teacher=teacher)
-    if iep.get('extensions'):
+    section=st.selectbox('Form section',['Student information & present levels','Special factors','Transition','Annual goals','Services & accommodations','Placement & team','Additional fields'],key='form_section_'+sid,persist_state='session')
+    if section=='Additional fields' and iep.get('extensions'):
         with st.expander('Template-specific information'):
             with st.form('template_extensions_'+sid):
                 proposed=copy.deepcopy(iep)
                 for field,value in iep['extensions'].items():
                     proposed['extensions'][field]=U.typed_value(field.replace('_',' ').title(),value,'ext_form_'+sid+field)
                 if st.form_submit_button('Submit template fields for review'): save_form(proposed,'Template-specific information')
-    st.caption("Equivalent structured form. Saving a section creates a review proposal; the approved record changes only after confirmation in Review.")
+    elif section=='Additional fields': st.info('This plan has no template-specific fields yet.')
+    st.caption("Complete one section at a time and save it for review before switching sections. The plan changes only after approval.")
     k = f"{sid}_{vcount}"
 
-    with st.expander("Page 1 – Student information and Student Profile", expanded=True):
+    if section=='Student information & present levels':
         with st.form(f"f1_{k}"):
             n = copy.deepcopy(iep)
             a, b, c3 = st.columns(3)
@@ -200,10 +205,10 @@ def form(student_id, teacher=""):
             n["meta"]["case_manager"] = c3.text_input("Case manager (not printed)", iep["meta"]["case_manager"])
             for fk, label in S.PROFILE_FIELDS:
                 n["profile"][fk] = st.text_area(label, iep["profile"][fk])
-            if st.form_submit_button("💾 Save page 1"):
+            if st.form_submit_button("Review student details"):
                 save_form(n, "Student information and profile")
 
-    with st.expander("Page 2 – Special factors, transportation, activities, progress reports"):
+    if section=='Special factors':
         with st.form(f"f2_{k}"):
             n = copy.deepcopy(iep)
             for fk, q in S.SPECIAL_FACTORS:
@@ -223,10 +228,10 @@ def form(student_id, teacher=""):
                 index=S.NONACADEMIC_OPTIONS.index(na["participation"]) if na["participation"] in S.NONACADEMIC_OPTIONS else 0)
             n["nonacademic"]["description"] = st.text_input("Describe supports / explanation", na["description"])
             n["progress_report_weeks"] = st.text_input("Progress reports every ___ weeks", iep["progress_report_weeks"])
-            if st.form_submit_button("💾 Save page 2"):
+            if st.form_submit_button("Review special factors"):
                 save_form(n, "Special factors and transportation")
 
-    with st.expander("Pages 3-4 – Transition (age 14+ or 9th grade)"):
+    if section=='Transition':
         with st.form(f"f3_{k}"):
             n = copy.deepcopy(iep)
             tr, tg = iep["transition"], iep["transition_goals"]
@@ -256,10 +261,10 @@ def form(student_id, teacher=""):
                 acts = st.text_area("Transition activities (one per line)", "\n".join(g["activities"]), key=f"ta_{ak}_{k}")
                 n["transition_goals"][ak]["activities"] = [x.strip() for x in acts.splitlines() if x.strip()]
                 n["transition_goals"][ak]["people"] = st.text_input("Person(s)/agency involved", g["people"], key=f"tp_{ak}_{k}")
-            if st.form_submit_button("💾 Save transition"):
+            if st.form_submit_button("Review transition changes"):
                 save_form(n, "Transition")
 
-    with st.expander(f"Page 5 – Annual goals ({len(iep['goals'])})"):
+    if section=='Annual goals':
         with st.form(f"f5_{k}"):
             n = copy.deepcopy(iep)
             keep = []
@@ -282,11 +287,11 @@ def form(student_id, teacher=""):
                     keep.append(ng)
                 st.divider()
             add = st.checkbox("Add a new empty goal")
-            if st.form_submit_button("💾 Save goals"):
+            if st.form_submit_button("Review goal changes"):
                 n["goals"] = keep + ([S.empty_goal() | {"mastery_date": iep["iep_to"]}] if add else [])
                 save_form(n, "Annual goals")
 
-    with st.expander("Page 6 – Special education and related services"):
+    if section=='Services & accommodations':
         with st.form(f"f6_{k}"):
             n = copy.deepcopy(iep)
             cols = ["service", "frequency", "amount", "begin", "end", "location"]
@@ -295,10 +300,10 @@ def form(student_id, teacher=""):
                 if ck != "special_education":
                     n["services"][ck]["needed"] = st.checkbox("Needed", iep["services"][ck]["needed"], key=f"sn_{ck}_{k}")
                 n["services"][ck]["rows"] = rows_editor(iep["services"][ck]["rows"], cols, f"sr_{ck}_{k}")
-            if st.form_submit_button("💾 Save services"):
+            if st.form_submit_button("Review service changes"):
                 save_form(n, "Services")
 
-    with st.expander("Page 7 – Transfer of rights, ESY, LRE, copies, team"):
+    if section=='Placement & team':
         with st.form(f"f7_{k}"):
             n = copy.deepcopy(iep)
             lre = iep["lre"]
@@ -320,7 +325,7 @@ def form(student_id, teacher=""):
             n["participants"] = rows_editor(iep["participants"], ["position", "name", "date"], f"pp_{k}")
             st.markdown("**Information from people not in attendance**")
             n["not_in_attendance"] = rows_editor(iep["not_in_attendance"], ["position", "name", "date"], f"pn_{k}")
-            if st.form_submit_button("💾 Save page 7"):
+            if st.form_submit_button("Review placement & team changes"):
                 save_form(n, "Rights, ESY, LRE and team")
 
 
@@ -377,6 +382,8 @@ def history(student_id, teacher=""):
                                    file_name=f"IEP_{sid}_v{j}.pdf", key=f"vpdf_{sid}_{j}")
                 if st.button("↩️ Restore this version", key=f"restore_{sid}_{j}"):
                     if run_safely(reviews.stage_change, sid, v['iep'], f"Restore version from {v['when']}", teacher, document=v.get('document')):
+                        st.session_state['pending_student_section']='IEP'
+                        st.session_state['pending_tool_'+sid]='Review'
                         flash("Restoration submitted for review.")
                         st.rerun()
     with right:

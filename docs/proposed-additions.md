@@ -5,27 +5,33 @@ students, simulated integrations and self-identified reviewers.
 
 ## Navigation and workflow
 
+The interface has received a [design pass](design-pass.md) informed by a
+[comparison of existing IEP management software](iep-software-comparison.md).
+
 There are two main tabs:
 
-* **Document** keeps the original PDF in the center. Optional page thumbnails,
-  page selection, zoom, field selection and region mapping surround the canvas.
-  The collapsible tools panel contains **Edit, Ask, Suggest updates,
-  Accommodations, History, Summary and Review**. The equivalent structured form
-  is an alternate document view. It retains the existing Alabama fields and adds
-  template-specific extensions.
-* **Connections & templates** contains roster synchronization, explicit student
-  identity links, course evidence, stakeholder reports and the template designer.
+* **My caseload** provides student search, a Needs review filter, recorded plan
+  dates and direct links to student overviews, IEPs and drafts. New student imports
+  have a separate review queue.
+* **Student workspace** contains **Overview, IEP, Documents, Progress & reports**.
+  The IEP section keeps the original PDF in the center, with page selection,
+  zoom, downloads, field selection and region mapping. **View IEP, Edit draft,
+  Ask, Review drafts** are visible actions; **Suggest updates, Accommodations,
+  History, Summary** are under More. The equivalent structured form is an alternate
+  document view, retaining the existing Alabama fields and template extensions.
 
-The sidebar contains student selection, import, supporting documents and the demo
-reviewer name/role. PDFs uploaded through import are archived unchanged. Existing
-JSON-only sample students receive a clearly labeled generated baseline PDF.
+**Tools & setup** contains templates, roster synchronization, explicit student
+identity links and workspace settings. Supporting files and IEP history live in
+Documents; course evidence and stakeholder reports live in Progress & reports.
+The reviewer name/role are requested at the decision step. Imported PDFs are
+archived unchanged. JSON-only samples receive a labeled generated baseline PDF.
 
 1. Import a PDF/TXT, edit a field, submit an AI suggestion, propose an accommodation,
    synchronize demographics or restore a version.
 2. A persistent review draft is created. The active IEP remains unchanged.
-3. Open **Document → Review**. Toggle the red source/current preview and green
+3. Open **Student workspace → IEP → Review drafts**. Toggle the red source/current preview and green
    proposed preview. The tool panel shows escaped word-level insertions/deletions;
-   **Equivalent form** shows all changed fields together. Original text, evidence,
+   **Form** shows all changed fields together. Original text, evidence,
    corrections and PDF binding controls remain available.
 4. Missing key data, OCR, truncation or extraction failures automatically escalate
    imports to a Specialist. Any open review can also be assigned to another named
