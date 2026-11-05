@@ -1,0 +1,4 @@
+-r requirements.txt
+pytest>=8
+beautifulsoup4>=4.12
+rdflib>=7

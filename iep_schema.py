@@ -155,7 +155,9 @@ def conform(data, template=_WHOLE_IEP):
 
 def normalize(iep: dict) -> dict:
     """Make every list item have the right fields too."""
+    extensions = copy.deepcopy(iep.get("extensions", {})) if isinstance(iep.get("extensions"), dict) else {}
     iep = conform(iep)
+    iep["extensions"] = extensions
     iep["goals"] = [conform(g, empty_goal()) for g in iep["goals"] if isinstance(g, dict)]
     for g in iep["goals"]:
         g["benchmarks"] = [conform(b, {"text": "", "date": ""}) for b in g["benchmarks"]
@@ -329,7 +331,11 @@ def to_sections(iep: dict) -> list[tuple[str, str]]:
 
 
 def to_text(iep: dict) -> str:
-    return "\n\n".join(f"== {title} ==\n{body}" for title, body in to_sections(iep))
+    content = "\n\n".join(f"== {title} ==\n{body}" for title, body in to_sections(iep))
+    if iep.get("extensions"):
+        import json
+        content += "\n\n== Template-specific information ==\n" + json.dumps(iep["extensions"], ensure_ascii=False)
+    return content
 
 
 def make_student_id(name: str) -> str:

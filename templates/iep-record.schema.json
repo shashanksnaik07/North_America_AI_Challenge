@@ -1,0 +1,1022 @@
+{
+  "type": "object",
+  "properties": {
+    "meta": {
+      "type": "object",
+      "properties": {
+        "eligibility": {
+          "type": "string"
+        },
+        "school": {
+          "type": "string"
+        },
+        "case_manager": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "eligibility",
+        "school",
+        "case_manager"
+      ],
+      "additionalProperties": false
+    },
+    "student_name": {
+      "type": "string"
+    },
+    "dob": {
+      "type": "string"
+    },
+    "school_year": {
+      "type": "string"
+    },
+    "grade": {
+      "type": "string"
+    },
+    "iep_from": {
+      "type": "string"
+    },
+    "iep_to": {
+      "type": "string"
+    },
+    "profile": {
+      "type": "object",
+      "properties": {
+        "strengths": {
+          "type": "string"
+        },
+        "parent_concerns": {
+          "type": "string"
+        },
+        "preferences_interests": {
+          "type": "string"
+        },
+        "evaluation_results": {
+          "type": "string"
+        },
+        "needs": {
+          "type": "string"
+        },
+        "other": {
+          "type": "string"
+        },
+        "ei_transition_justification": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "strengths",
+        "parent_concerns",
+        "preferences_interests",
+        "evaluation_results",
+        "needs",
+        "other",
+        "ei_transition_justification"
+      ],
+      "additionalProperties": false
+    },
+    "special_factors": {
+      "type": "object",
+      "properties": {
+        "behavior_impedes": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "bip": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "limited_english": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "braille": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "communication": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "assistive_tech": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "specially_designed_pe": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "alternate_assessment": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "transition_services": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "behavior_impedes",
+        "bip",
+        "limited_english",
+        "braille",
+        "communication",
+        "assistive_tech",
+        "specially_designed_pe",
+        "alternate_assessment",
+        "transition_services"
+      ],
+      "additionalProperties": false
+    },
+    "transportation": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string"
+        },
+        "mode_other": {
+          "type": "string"
+        },
+        "related_service": {
+          "type": "boolean"
+        },
+        "transport_rep_involved": {
+          "type": "boolean"
+        },
+        "needs": {
+          "type": "array"
+        },
+        "needs_details": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "mode",
+        "mode_other",
+        "related_service",
+        "transport_rep_involved",
+        "needs",
+        "needs_details"
+      ],
+      "additionalProperties": false
+    },
+    "nonacademic": {
+      "type": "object",
+      "properties": {
+        "participation": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "participation",
+        "description"
+      ],
+      "additionalProperties": false
+    },
+    "progress_report_weeks": {
+      "type": "string"
+    },
+    "transition": {
+      "type": "object",
+      "properties": {
+        "applicable": {
+          "type": "boolean"
+        },
+        "student_invited_date": {
+          "type": "string"
+        },
+        "student_invited_via": {
+          "type": "string"
+        },
+        "agencies_invited": {
+          "type": "boolean"
+        },
+        "addressed_on_goal_page": {
+          "type": "boolean"
+        },
+        "assessments": {
+          "type": "array"
+        },
+        "assessment_other": {
+          "type": "string"
+        },
+        "postsecondary": {
+          "type": "object",
+          "properties": {
+            "education": {
+              "type": "object",
+              "properties": {
+                "assessments": {
+                  "type": "array"
+                },
+                "long_term_goal": {
+                  "type": "string"
+                },
+                "other": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "assessments",
+                "long_term_goal",
+                "other"
+              ],
+              "additionalProperties": false
+            },
+            "employment": {
+              "type": "object",
+              "properties": {
+                "assessments": {
+                  "type": "array"
+                },
+                "long_term_goal": {
+                  "type": "string"
+                },
+                "other": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "assessments",
+                "long_term_goal",
+                "other"
+              ],
+              "additionalProperties": false
+            },
+            "independent_living": {
+              "type": "object",
+              "properties": {
+                "assessments": {
+                  "type": "array"
+                },
+                "long_term_goal": {
+                  "type": "string"
+                },
+                "other": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "assessments",
+                "long_term_goal",
+                "other"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "education",
+            "employment",
+            "independent_living"
+          ],
+          "additionalProperties": false
+        },
+        "middle_school_course": {
+          "type": "boolean"
+        },
+        "exit_month": {
+          "type": "string"
+        },
+        "exit_year": {
+          "type": "string"
+        },
+        "pathway": {
+          "type": "string"
+        },
+        "credits": {
+          "type": "object",
+          "properties": {
+            "General Education Pathway": {
+              "type": "object",
+              "properties": {
+                "english": {
+                  "type": "string"
+                },
+                "math": {
+                  "type": "string"
+                },
+                "science": {
+                  "type": "string"
+                },
+                "social_studies": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "english",
+                "math",
+                "science",
+                "social_studies"
+              ],
+              "additionalProperties": false
+            },
+            "Essentials Pathway": {
+              "type": "object",
+              "properties": {
+                "english": {
+                  "type": "string"
+                },
+                "math": {
+                  "type": "string"
+                },
+                "science": {
+                  "type": "string"
+                },
+                "social_studies": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "english",
+                "math",
+                "science",
+                "social_studies"
+              ],
+              "additionalProperties": false
+            },
+            "Alternate Achievement Standards Pathway": {
+              "type": "object",
+              "properties": {
+                "english": {
+                  "type": "string"
+                },
+                "math": {
+                  "type": "string"
+                },
+                "science": {
+                  "type": "string"
+                },
+                "social_studies": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "english",
+                "math",
+                "science",
+                "social_studies"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "General Education Pathway",
+            "Essentials Pathway",
+            "Alternate Achievement Standards Pathway"
+          ],
+          "additionalProperties": false
+        },
+        "electives": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "applicable",
+        "student_invited_date",
+        "student_invited_via",
+        "agencies_invited",
+        "addressed_on_goal_page",
+        "assessments",
+        "assessment_other",
+        "postsecondary",
+        "middle_school_course",
+        "exit_month",
+        "exit_year",
+        "pathway",
+        "credits",
+        "electives"
+      ],
+      "additionalProperties": false
+    },
+    "transition_goals": {
+      "type": "object",
+      "properties": {
+        "present_level": {
+          "type": "string"
+        },
+        "education": {
+          "type": "object",
+          "properties": {
+            "goal": {
+              "type": "string"
+            },
+            "mastery_date": {
+              "type": "string"
+            },
+            "services": {
+              "type": "string"
+            },
+            "activities": {
+              "type": "array"
+            },
+            "people": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "goal",
+            "mastery_date",
+            "services",
+            "activities",
+            "people"
+          ],
+          "additionalProperties": false
+        },
+        "employment": {
+          "type": "object",
+          "properties": {
+            "goal": {
+              "type": "string"
+            },
+            "mastery_date": {
+              "type": "string"
+            },
+            "services": {
+              "type": "string"
+            },
+            "activities": {
+              "type": "array"
+            },
+            "people": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "goal",
+            "mastery_date",
+            "services",
+            "activities",
+            "people"
+          ],
+          "additionalProperties": false
+        },
+        "independent_living": {
+          "type": "object",
+          "properties": {
+            "goal": {
+              "type": "string"
+            },
+            "mastery_date": {
+              "type": "string"
+            },
+            "services": {
+              "type": "string"
+            },
+            "activities": {
+              "type": "array"
+            },
+            "people": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "goal",
+            "mastery_date",
+            "services",
+            "activities",
+            "people"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "present_level",
+        "education",
+        "employment",
+        "independent_living"
+      ],
+      "additionalProperties": false
+    },
+    "goals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "present_level": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          },
+          "mastery_date": {
+            "type": "string"
+          },
+          "evaluation": {
+            "type": "array"
+          },
+          "evaluation_other": {
+            "type": "string"
+          },
+          "benchmarks": {
+            "type": "array"
+          }
+        },
+        "required": [
+          "area",
+          "present_level",
+          "goal",
+          "mastery_date",
+          "evaluation",
+          "evaluation_other",
+          "benchmarks"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "services": {
+      "type": "object",
+      "properties": {
+        "special_education": {
+          "type": "object",
+          "properties": {
+            "needed": {
+              "type": "boolean"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string"
+                  },
+                  "frequency": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "string"
+                  },
+                  "begin": {
+                    "type": "string"
+                  },
+                  "end": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "service",
+                  "frequency",
+                  "amount",
+                  "begin",
+                  "end",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "needed",
+            "rows"
+          ],
+          "additionalProperties": false
+        },
+        "related_services": {
+          "type": "object",
+          "properties": {
+            "needed": {
+              "type": "boolean"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string"
+                  },
+                  "frequency": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "string"
+                  },
+                  "begin": {
+                    "type": "string"
+                  },
+                  "end": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "service",
+                  "frequency",
+                  "amount",
+                  "begin",
+                  "end",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "needed",
+            "rows"
+          ],
+          "additionalProperties": false
+        },
+        "supplementary_aids": {
+          "type": "object",
+          "properties": {
+            "needed": {
+              "type": "boolean"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string"
+                  },
+                  "frequency": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "string"
+                  },
+                  "begin": {
+                    "type": "string"
+                  },
+                  "end": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "service",
+                  "frequency",
+                  "amount",
+                  "begin",
+                  "end",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "needed",
+            "rows"
+          ],
+          "additionalProperties": false
+        },
+        "program_modifications": {
+          "type": "object",
+          "properties": {
+            "needed": {
+              "type": "boolean"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string"
+                  },
+                  "frequency": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "string"
+                  },
+                  "begin": {
+                    "type": "string"
+                  },
+                  "end": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "service",
+                  "frequency",
+                  "amount",
+                  "begin",
+                  "end",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "needed",
+            "rows"
+          ],
+          "additionalProperties": false
+        },
+        "assessment_accommodations": {
+          "type": "object",
+          "properties": {
+            "needed": {
+              "type": "boolean"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string"
+                  },
+                  "frequency": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "string"
+                  },
+                  "begin": {
+                    "type": "string"
+                  },
+                  "end": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "service",
+                  "frequency",
+                  "amount",
+                  "begin",
+                  "end",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "needed",
+            "rows"
+          ],
+          "additionalProperties": false
+        },
+        "assistive_technology": {
+          "type": "object",
+          "properties": {
+            "needed": {
+              "type": "boolean"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string"
+                  },
+                  "frequency": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "string"
+                  },
+                  "begin": {
+                    "type": "string"
+                  },
+                  "end": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "service",
+                  "frequency",
+                  "amount",
+                  "begin",
+                  "end",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "needed",
+            "rows"
+          ],
+          "additionalProperties": false
+        },
+        "support_for_personnel": {
+          "type": "object",
+          "properties": {
+            "needed": {
+              "type": "boolean"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "service": {
+                    "type": "string"
+                  },
+                  "frequency": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "string"
+                  },
+                  "begin": {
+                    "type": "string"
+                  },
+                  "end": {
+                    "type": "string"
+                  },
+                  "location": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "service",
+                  "frequency",
+                  "amount",
+                  "begin",
+                  "end",
+                  "location"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": [
+            "needed",
+            "rows"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "special_education",
+        "related_services",
+        "supplementary_aids",
+        "program_modifications",
+        "assessment_accommodations",
+        "assistive_technology",
+        "support_for_personnel"
+      ],
+      "additionalProperties": false
+    },
+    "transfer_of_rights_date": {
+      "type": "string"
+    },
+    "esy_considered": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "lre": {
+      "type": "object",
+      "properties": {
+        "attends_home_school": {
+          "type": "boolean"
+        },
+        "home_school_explain": {
+          "type": "string"
+        },
+        "all_with_nondisabled": {
+          "type": "boolean"
+        },
+        "nondisabled_explain": {
+          "type": "string"
+        },
+        "age_group": {
+          "type": "string"
+        },
+        "setting": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "attends_home_school",
+        "home_school_explain",
+        "all_with_nondisabled",
+        "nondisabled_explain",
+        "age_group",
+        "setting"
+      ],
+      "additionalProperties": false
+    },
+    "copies": {
+      "type": "object",
+      "properties": {
+        "iep_given": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "iep_sent_date": {
+          "type": "string"
+        },
+        "rights_given": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "rights_sent_date": {
+          "type": "string"
+        },
+        "amended_sent_date": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "iep_given",
+        "iep_sent_date",
+        "rights_given",
+        "rights_sent_date",
+        "amended_sent_date"
+      ],
+      "additionalProperties": false
+    },
+    "participants": {
+      "type": "array"
+    },
+    "not_in_attendance": {
+      "type": "array"
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "number",
+          "boolean",
+          "null",
+          "array",
+          "object"
+        ]
+      }
+    }
+  },
+  "required": [
+    "meta",
+    "student_name",
+    "dob",
+    "school_year",
+    "grade",
+    "iep_from",
+    "iep_to",
+    "profile",
+    "special_factors",
+    "transportation",
+    "nonacademic",
+    "progress_report_weeks",
+    "transition",
+    "transition_goals",
+    "goals",
+    "services",
+    "transfer_of_rights_date",
+    "esy_considered",
+    "lre",
+    "copies",
+    "participants",
+    "not_in_attendance"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

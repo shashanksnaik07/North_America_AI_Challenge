@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "@context",
+    "nodes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0"
+    },
+    "@context": {
+      "type": "object"
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "Entity",
+              "Agent",
+              "Person",
+              "Organization",
+              "InformationArtifact",
+              "Plan",
+              "Assertion",
+              "Evidence",
+              "Activity",
+              "Observation",
+              "Decision",
+              "TimeInterval",
+              "Location",
+              "Student",
+              "Stakeholder",
+              "Course",
+              "IEP",
+              "Goal",
+              "Service",
+              "Accommodation",
+              "Assessment",
+              "CourseReport",
+              "SourceDocument",
+              "Placement",
+              "Eligibility",
+              "ReviewDecision",
+              "Template",
+              "FieldBinding"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "subject": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

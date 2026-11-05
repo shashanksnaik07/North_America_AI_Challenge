@@ -1,0 +1,39 @@
+@prefix iep: <https://example.org/iep-ontology/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+iep: a owl:Ontology .
+iep:Entity a owl:Class .
+iep:Agent a owl:Class; rdfs:subClassOf iep:Entity .
+iep:Person a owl:Class; rdfs:subClassOf iep:Agent .
+iep:Organization a owl:Class; rdfs:subClassOf iep:Agent .
+iep:InformationArtifact a owl:Class; rdfs:subClassOf iep:Entity .
+iep:Plan a owl:Class; rdfs:subClassOf iep:InformationArtifact .
+iep:Assertion a owl:Class; rdfs:subClassOf iep:InformationArtifact .
+iep:Evidence a owl:Class; rdfs:subClassOf iep:InformationArtifact .
+iep:Activity a owl:Class; rdfs:subClassOf iep:Entity .
+iep:Observation a owl:Class; rdfs:subClassOf iep:Activity .
+iep:Decision a owl:Class; rdfs:subClassOf iep:Activity .
+iep:TimeInterval a owl:Class; rdfs:subClassOf iep:Entity .
+iep:Location a owl:Class; rdfs:subClassOf iep:Entity .
+iep:Student a owl:Class; rdfs:subClassOf iep:Person .
+iep:Stakeholder a owl:Class; rdfs:subClassOf iep:Person .
+iep:Course a owl:Class; rdfs:subClassOf iep:Activity .
+iep:IEP a owl:Class; rdfs:subClassOf iep:Plan .
+iep:Goal a owl:Class; rdfs:subClassOf iep:Plan .
+iep:Service a owl:Class; rdfs:subClassOf iep:Activity .
+iep:Accommodation a owl:Class; rdfs:subClassOf iep:Plan .
+iep:Assessment a owl:Class; rdfs:subClassOf iep:Observation .
+iep:CourseReport a owl:Class; rdfs:subClassOf iep:Evidence .
+iep:SourceDocument a owl:Class; rdfs:subClassOf iep:Evidence .
+iep:Placement a owl:Class; rdfs:subClassOf iep:Assertion .
+iep:Eligibility a owl:Class; rdfs:subClassOf iep:Assertion .
+iep:ReviewDecision a owl:Class; rdfs:subClassOf iep:Decision .
+iep:Template a owl:Class; rdfs:subClassOf iep:InformationArtifact .
+iep:FieldBinding a owl:Class; rdfs:subClassOf iep:InformationArtifact .
+iep:subject a owl:ObjectProperty; rdfs:domain iep:InformationArtifact; rdfs:range iep:Entity .
+iep:partOf a owl:ObjectProperty; rdfs:domain iep:Entity; rdfs:range iep:Entity .
+iep:supportedBy a owl:ObjectProperty; rdfs:domain iep:Assertion; rdfs:range iep:Evidence .
+iep:performedBy a owl:ObjectProperty; rdfs:domain iep:Activity; rdfs:range iep:Agent .
+iep:occursDuring a owl:ObjectProperty; rdfs:domain iep:Activity; rdfs:range iep:TimeInterval .
+iep:occursAt a owl:ObjectProperty; rdfs:domain iep:Activity; rdfs:range iep:Location .
+iep:usesTemplate a owl:ObjectProperty; rdfs:domain iep:IEP; rdfs:range iep:Template .

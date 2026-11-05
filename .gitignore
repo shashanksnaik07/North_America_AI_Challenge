@@ -14,3 +14,8 @@ __pycache__/
 
 # Uploaded or exported IEPs - keep real student files off GitHub
 *.pdf
+
+.pytest_cache/
+pytest-cache-files-*/
+output/
+tmp/
