@@ -316,6 +316,53 @@ def page_final(iep):
     return out
 
 
+def page_extended(iep: dict) -> list:
+    """Supplemental page: Medicaid, ADL, Safety monitoring (not on ALSDE form)."""
+    ext = iep.get("extended", {})
+    mc = ext.get("mcaid", {}) if isinstance(ext, dict) else {}
+    adl = ext.get("adl", {}) if isinstance(ext, dict) else {}
+    safety = ext.get("safety", {}) if isinstance(ext, dict) else {}
+    out = [B("SUPPLEMENTAL INFORMATION (not part of the Alabama IEP form)", st_head), Spacer(1, 6)]
+
+    # Medicaid
+    rows = [[B("MEDICAID (MCAID) BILLING", st_head)],
+            [B(f"Parental consent for Medicaid billing on file? {yn(mc.get('consent_on_file'))}", st_body)],
+            [P(f"Medicaid billing number: {mc.get('billing_number') or '—'}")],
+            [P(f"Services billed to Medicaid: {mc.get('services_billed') or '—'}")],
+            [P(f"Notes: {mc.get('notes') or '—'}")]]
+    out += [table(rows, [W]), Spacer(1, 6)]
+
+    # ADL
+    adl_rows = [[B("ACTIVITIES OF DAILY LIVING (ADL)", st_head)],
+                [B(f"ADL support applicable to this student? {box(adl.get('applicable'))} YES  "
+                   f"{box(not adl.get('applicable'))} NO", st_body)]]
+    skill_head = [B("Skill"), B("Current Level"), B("Goal / Target")]
+    adl_skill_rows = [skill_head]
+    for skill in S.ADL_SKILLS:
+        v = adl.get("skills", {}).get(skill, {})
+        lvl = v.get("level", "") if isinstance(v, dict) else ""
+        goal = v.get("goal", "") if isinstance(v, dict) else ""
+        adl_skill_rows.append([P(skill), P(lvl), P(goal)])
+    adl_rows.append([table(adl_skill_rows, [2.5 * inch, 2.0 * inch, 3.0 * inch])])
+    if adl.get("notes"):
+        adl_rows.append([P(f"Notes: {adl['notes']}")])
+    out += [table(adl_rows, [W]), Spacer(1, 6)]
+
+    # Safety
+    risk = safety.get("risk_level", "")
+    risk_boxes = "  ".join(f"{box(risk == r)} {r}" for r in S.SAFETY_RISK_LEVELS)
+    rows = [[B("SAFETY MONITORING PLAN", st_head)],
+            [B(f"Safety monitoring applicable? {box(safety.get('applicable'))} YES  "
+               f"{box(not safety.get('applicable'))} NO", st_body)],
+            [B(f"Risk level: {risk_boxes}", st_body)],
+            [B(f"Elopement / wandering risk? {yn(safety.get('elopement_risk'))}", st_body)],
+            [P(f"Medical alerts: {safety.get('medical_alerts') or '—'}")],
+            [P(f"Emergency protocol: {safety.get('emergency_protocol') or '—'}")],
+            [P(f"Monitoring notes: {safety.get('monitoring_notes') or '—'}")]]
+    out += [table(rows, [W])]
+    return out
+
+
 def build_pdf(iep: dict) -> bytes:
     iep = S.normalize(iep)
     buf = io.BytesIO()
@@ -328,5 +375,38 @@ def build_pdf(iep: dict) -> bytes:
     for g in iep["goals"] or [S.empty_goal()]:
         story += [PageBreak()] + page_goal(g)
     story += [PageBreak()] + page_services(iep) + [PageBreak()] + page_final(iep)
+    ext = iep.get("extended", {})
+    if isinstance(ext, dict):
+        mc, adl, safety = ext.get("mcaid", {}), ext.get("adl", {}), ext.get("safety", {})
+        if (mc.get("billing_number") or mc.get("consent_on_file") is not None
+                or adl.get("applicable") or safety.get("applicable")):
+            story += [PageBreak()] + page_extended(iep)
     doc.build(story, canvasmaker=lambda *a, **k: NumberedCanvas(*a, iep=iep, **k))
+    return buf.getvalue()
+
+
+def build_pwn_pdf(student_name: str, pwn_text: str) -> bytes:
+    """Render a Prior Written Notice as a standalone PDF."""
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter, leftMargin=0.75 * inch, rightMargin=0.75 * inch,
+                            topMargin=1.0 * inch, bottomMargin=0.75 * inch,
+                            title=f"Prior Written Notice – {student_name}",
+                            author="IEP Assistant (draft)")
+    story = []
+    for line in pwn_text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            story.append(Spacer(1, 4))
+        elif stripped.startswith("## "):
+            story.append(B(stripped[3:], st_head))
+            story.append(Spacer(1, 4))
+        elif stripped.startswith("### "):
+            story.append(B(stripped[4:], st_left_head))
+            story.append(Spacer(1, 2))
+        elif stripped.startswith("**") and stripped.endswith("**"):
+            story.append(B(stripped[2:-2]))
+        else:
+            story.append(P(stripped))
+    iep_stub = {"student_name": student_name, "dob": ""}
+    doc.build(story, canvasmaker=lambda *a, **k: NumberedCanvas(*a, iep=iep_stub, **k))
     return buf.getvalue()
