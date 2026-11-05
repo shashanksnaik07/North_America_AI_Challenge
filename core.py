@@ -165,6 +165,63 @@ def get_profile(sid: str) -> dict:
     }
 
 
+def get_dashboard() -> list[dict]:
+    """Return a summary row for every student — used by the class dashboard."""
+    rows = []
+    today = datetime.date.today()
+    for sid, name in list_students().items():
+        try:
+            iep = get_iep(sid)
+        except Exception:  # noqa: BLE001
+            continue
+        # Next benchmark date across all goals
+        next_bm_date, next_bm_text = None, ""
+        for g in iep["goals"]:
+            for bm in g["benchmarks"]:
+                if bm.get("text") and bm.get("date"):
+                    try:
+                        d = datetime.datetime.strptime(bm["date"], "%m/%d/%Y").date()
+                        if next_bm_date is None or d < next_bm_date:
+                            next_bm_date = d
+                            next_bm_text = bm["text"][:60] + ("…" if len(bm["text"]) > 60 else "")
+                    except ValueError:
+                        pass
+        # IEP expiry
+        iep_to_date = None
+        if iep["iep_to"]:
+            try:
+                iep_to_date = datetime.datetime.strptime(iep["iep_to"], "%m/%d/%Y").date()
+            except ValueError:
+                pass
+        days_to_expiry = (iep_to_date - today).days if iep_to_date else None
+        # Urgency: red < 30 days, yellow < 90 days, green otherwise
+        if days_to_expiry is None:
+            urgency = "—"
+        elif days_to_expiry < 0:
+            urgency = "🔴 Expired"
+        elif days_to_expiry < 30:
+            urgency = f"🔴 {days_to_expiry}d"
+        elif days_to_expiry < 90:
+            urgency = f"🟡 {days_to_expiry}d"
+        else:
+            urgency = f"🟢 {days_to_expiry}d"
+        rows.append({
+            "sid": sid,
+            "name": name,
+            "grade": iep["grade"],
+            "eligibility": iep["meta"]["eligibility"],
+            "goals": len(iep["goals"]),
+            "iep_to": iep["iep_to"],
+            "days_to_expiry": days_to_expiry,
+            "urgency": urgency,
+            "next_benchmark": next_bm_date.strftime("%b %d, %Y") if next_bm_date else "—",
+            "next_bm_text": next_bm_text,
+            "case_manager": iep["meta"]["case_manager"],
+        })
+    rows.sort(key=lambda r: (r["days_to_expiry"] is None, r["days_to_expiry"] or 9999))
+    return rows
+
+
 # ---------------------------------------------------------------------------
 # Uploaded files
 # ---------------------------------------------------------------------------
@@ -652,3 +709,110 @@ def blank_iep(name: str) -> dict:
     iep = S.empty_iep()
     iep["student_name"] = name
     return copy.deepcopy(iep)
+
+
+# ---------------------------------------------------------------------------
+# Prior Written Notice (PWN)
+# ---------------------------------------------------------------------------
+def generate_pwn(sid: str) -> str:
+    """Generate a Prior Written Notice document for the current IEP.
+
+    A PWN is required by IDEA every time the school proposes or refuses to
+    initiate or change the identification, evaluation, placement, or provision
+    of FAPE for a child. This draft must be reviewed and signed by the team.
+    """
+    iep = get_iep(sid)
+    text = S.to_text(iep)
+    return _chat(
+        "You are a special education compliance specialist. "
+        "Write a Prior Written Notice (PWN) that meets IDEA requirements. "
+        "Use ONLY the information in the IEP provided. "
+        "Never invent facts. Mark any missing required field with [MISSING]. "
+        "The document must be professional, plain English, and parent-friendly.",
+        f"""Write a Prior Written Notice (PWN) for the IEP below.
+
+Structure the document with these sections:
+## Prior Written Notice
+**Student:** [name]  **Date:** [iep_from]  **School:** [school]
+
+### Action Proposed by the IEP Team
+Summarise what the team is proposing or changing (placement, goals, services).
+
+### Description of Each Proposed Action
+List each proposed change or service in plain language.
+
+### Why the Team is Proposing These Actions
+Explain the reasons, referencing evaluation results and student needs from the IEP.
+
+### Description of Other Options Considered
+Briefly note alternatives considered and why they were rejected.
+
+### Description of Each Evaluation Procedure, Test, or Report Used
+List the assessments or data used to make these decisions.
+
+### Sources of Information Used by the Team
+List the documents, reports, and evaluations referenced.
+
+### Other Factors Relevant to the Proposal
+Note any additional relevant information.
+
+### Parent's Right to Respond
+Include a standard statement: Parents have the right to request mediation or a due
+process hearing if they disagree with this notice. Contact [school] for more information.
+
+---
+IEP:
+{text}""",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Goal-based Activities & Worksheets
+# ---------------------------------------------------------------------------
+def generate_activities(sid: str) -> list[dict]:
+    """For each annual goal, generate classroom activity ideas and a worksheet prompt.
+
+    Returns a list of dicts: {goal_area, goal_text, activities, worksheet_prompt}
+    """
+    iep = get_iep(sid)
+    if not iep["goals"]:
+        return []
+
+    goals_text = "\n\n".join(
+        f"Goal {i} – {g['area']}:\n"
+        f"Present level: {g['present_level']}\n"
+        f"Goal: {g['goal']}\n"
+        f"Next benchmark: {g['benchmarks'][0]['text'] if g['benchmarks'] and g['benchmarks'][0]['text'] else 'none'}"
+        for i, g in enumerate(iep["goals"], 1)
+    )
+    name = iep["student_name"].split()[0] if iep["student_name"] else "the student"
+    eligibility = iep["meta"]["eligibility"]
+
+    data = _chat_json(
+        "You are a special education curriculum specialist. "
+        "Generate practical, evidence-based classroom activities and worksheet ideas "
+        "tailored to a student's specific IEP goals. "
+        "Be concrete and immediately usable by a teacher. "
+        "Respond with JSON only.",
+        f"""Student: {name}  |  Eligibility: {eligibility}
+
+For each goal below, provide:
+- 3 short classroom activity ideas (1-2 sentences each, immediately actionable)
+- 1 worksheet/printable idea the teacher can create or find
+
+Return JSON:
+{{
+  "activities": [
+    {{
+      "goal_area": "...",
+      "goal_text": "...",
+      "activities": ["activity 1", "activity 2", "activity 3"],
+      "worksheet_prompt": "Describe a worksheet that directly practices this goal."
+    }}
+  ]
+}}
+
+GOALS:
+{goals_text}""",
+    )
+    return data.get("activities", [])
