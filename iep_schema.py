@@ -4,6 +4,11 @@ iep_schema.py - the Alabama IEP form (ALSDE, Feb. 2019) as structured data.
 Every IEP in the app is stored as a dictionary with exactly this shape, so
 each box on the paper form has its own field. That lets the AI change one
 field at a time (e.g. "goals.0.goal") instead of guessing where text goes.
+
+Extended fields (not on the ALSDE paper form) are stored in iep["extended"]:
+  - Medicaid (MCAID) billing / consent tracking
+  - Activities of Daily Living (ADL) checklist
+  - Safety monitoring plan
 """
 
 import copy
@@ -65,6 +70,14 @@ DEFAULT_PARTICIPANTS = [
     "Student", "Career/Technical Education Representative", "Other Agency Representative",
 ]
 
+# Extended (not on ALSDE form) -----------------------------------------------
+ADL_SKILLS = [
+    "Eating / Feeding", "Dressing / Undressing", "Personal Hygiene / Grooming",
+    "Toileting", "Mobility / Transfers", "Communication (functional)", "Money management",
+    "Time management", "Meal preparation", "Household chores",
+]
+SAFETY_RISK_LEVELS = ["Low", "Moderate", "High"]
+
 
 def empty_service() -> dict:
     return {"service": "", "frequency": "", "amount": "", "begin": "", "end": "", "location": ""}
@@ -124,6 +137,28 @@ def empty_iep() -> dict:
                    "rights_sent_date": "", "amended_sent_date": ""},
         "participants": [{"position": p, "name": "", "date": ""} for p in DEFAULT_PARTICIPANTS],
         "not_in_attendance": [],
+        # Extended supplemental section (not on ALSDE paper form)
+        "extended": {
+            "mcaid": {
+                "consent_on_file": None,      # True / False / None
+                "billing_number": "",
+                "services_billed": "",
+                "notes": "",
+            },
+            "adl": {
+                "applicable": False,
+                "skills": {skill: {"level": "", "goal": ""} for skill in ADL_SKILLS},
+                "notes": "",
+            },
+            "safety": {
+                "applicable": False,
+                "risk_level": "",             # Low / Moderate / High
+                "elopement_risk": False,
+                "medical_alerts": "",
+                "emergency_protocol": "",
+                "monitoring_notes": "",
+            },
+        },
     }
 
 
@@ -172,6 +207,14 @@ def normalize(iep: dict) -> dict:
         ps = iep["transition"]["postsecondary"][k]
         ps["assessments"] = [conform(a, {"name": "", "date": ""}) for a in ps["assessments"]
                              if isinstance(a, dict)]
+    # Ensure extended ADL skill sub-dicts are all present
+    ext = iep.get("extended", {})
+    if isinstance(ext, dict):
+        adl = ext.get("adl", {})
+        if isinstance(adl, dict) and "skills" in adl:
+            for skill in ADL_SKILLS:
+                if skill not in adl["skills"]:
+                    adl["skills"][skill] = {"level": "", "goal": ""}
     return iep
 
 
@@ -226,7 +269,7 @@ def text_fields(iep: dict, prefix: str = "") -> list[tuple[str, str]]:
     out = []
     if isinstance(iep, dict):
         for k, v in iep.items():
-            if k in ("participants", "not_in_attendance", "copies", "credits"):
+            if k in ("participants", "not_in_attendance", "copies", "credits", "extended"):
                 continue
             out += text_fields(v, f"{prefix}{k}.")
     elif isinstance(iep, list) and all(isinstance(x, str) for x in iep) and prefix.endswith("activities."):
@@ -325,6 +368,39 @@ def to_sections(iep: dict) -> list[tuple[str, str]]:
     ])))
     people = "; ".join(f"{p['position']}: {p['name']}" for p in iep["participants"] if p["name"])
     s.append(("IEP Team", f"Attended: {people or 'not recorded'}"))
+    # Extended supplemental section
+    ext = iep.get("extended", {})
+    if isinstance(ext, dict):
+        mc = ext.get("mcaid", {})
+        adl = ext.get("adl", {})
+        safety = ext.get("safety", {})
+        ext_lines = []
+        if mc.get("billing_number") or mc.get("services_billed") or mc.get("consent_on_file") is not None:
+            ext_lines.append(f"Medicaid consent on file: {_yn(mc.get('consent_on_file'))}")
+            if mc.get("billing_number"):
+                ext_lines.append(f"Medicaid billing number: {mc['billing_number']}")
+            if mc.get("services_billed"):
+                ext_lines.append(f"Services billed to Medicaid: {mc['services_billed']}")
+            if mc.get("notes"):
+                ext_lines.append(f"Medicaid notes: {mc['notes']}")
+        if adl.get("applicable"):
+            ext_lines.append("ADL support applicable: YES")
+            for skill, v in adl.get("skills", {}).items():
+                if isinstance(v, dict) and (v.get("level") or v.get("goal")):
+                    ext_lines.append(f"  ADL – {skill}: level={v.get('level','')}, goal={v.get('goal','')}")
+            if adl.get("notes"):
+                ext_lines.append(f"ADL notes: {adl['notes']}")
+        if safety.get("applicable"):
+            ext_lines.append(f"Safety monitoring: YES | Risk level: {safety.get('risk_level','')}")
+            ext_lines.append(f"Elopement risk: {_yn(safety.get('elopement_risk'))}")
+            if safety.get("medical_alerts"):
+                ext_lines.append(f"Medical alerts: {safety['medical_alerts']}")
+            if safety.get("emergency_protocol"):
+                ext_lines.append(f"Emergency protocol: {safety['emergency_protocol']}")
+            if safety.get("monitoring_notes"):
+                ext_lines.append(f"Monitoring notes: {safety['monitoring_notes']}")
+        if ext_lines:
+            s.append(("Supplemental (Medicaid / ADL / Safety)", "\n".join(ext_lines)))
     return s
 
 
