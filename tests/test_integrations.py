@@ -73,7 +73,7 @@ def test_course_reports_aggregate_and_enter_suggestion_prompt(platform, record, 
         prompts.append(prompt)
         return {'suggestions': [{'action': 'change', 'field': 'profile.needs', 'new_value': 'Review extended time across courses.', 'reason': 'Mixed reports', 'source': 'E1'}]}
     monkeypatch.setattr(core, '_chat_json', chat)
-    suggestions = core.suggest_updates(sid, 'Review accommodation usage across courses.')
+    suggestions = core.suggest_updates(sid)
     assert 'Algebra I' in prompts[0] and 'English 9' in prompts[0]
     assert len(suggestions[0]['evidence']) == 2
     text, used, omitted = I.evidence_context(sid, limit_chars=1)

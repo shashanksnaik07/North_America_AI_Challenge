@@ -91,11 +91,13 @@ def test_draft_persists_across_tools_and_is_student_specific(workspace,record,or
     assert core.get_iep(sid)['student_name']=='Jordan Ellis'
 
 
-def test_report_to_suggestion_navigation(platform,record,original_pdf):
+def test_report_to_suggestion_navigation(platform,record,original_pdf,monkeypatch):
     import integrations as I
     sid,app=ready(record,original_pdf)
     I.sync_sis('powerschool',platform.base)
     I.link_student(sid,'powerschool','powerschool:stu-001')
+    calls=[]
+    monkeypatch.setattr(core,'suggest_updates',lambda student,**kw:calls.append((student,kw)) or [])
     I.submit_report(sid,'powerschool:math-9','Demo Teacher','Extended time','Sometimes','Mixed','Observed completion varies.','2026-10-01','2026-10-31')
     app.session_state['main_navigation']='Student workspace'
     app.session_state['student_section']='Progress & reports';app.run()
@@ -103,6 +105,10 @@ def test_report_to_suggestion_navigation(platform,record,original_pdf):
     assert app.session_state['main_navigation']=='Student workspace'
     assert app.session_state['active_tool_'+sid]=='Modifications'
     assert any(b.label=='Draft modifications' for b in app.button)
+    assert calls==[(sid,{'review_area':'Whole IEP'})]
+    assert not any(t.label=='Question or observation' for t in app.text_area)
+    app.run()
+    assert len(calls)==1  # a rerun must not repeat the automatic request
 
 
 def test_caseload_search_and_student_overview(workspace,record,original_pdf):
@@ -160,15 +166,16 @@ def test_connections_from_caseload_identify_the_target_student(workspace,record)
 
 
 def test_single_modification_workflow_discussion_to_review(workspace,record,original_pdf,monkeypatch):
+    monkeypatch.setattr(core,'list_supporting_docs',lambda sid:['Progress observation.txt'])
     sid,app=ready(record,original_pdf)
     monkeypatch.setattr(core,'answer',lambda student,question:('Consider course-specific evidence before changing the plan.',[]))
-    monkeypatch.setattr(core,'suggest_updates',lambda student,note:[{
+    monkeypatch.setattr(core,'suggest_updates',lambda student,note='',**kw:[{
         'action':'change','field':'profile.needs','section':'Learning and support needs','source':'test observation',
         'current_text':record['profile']['needs'],'suggested_text':'Proposed classroom support wording.',
         'reason':'Compare observations across courses.','teacher_note':note,'evidence':[]}])
     click(app,'Suggested modifications')
     assert not any(b.label in ['Ask','Suggest updates','Accommodations','Generate summary','Summary'] for b in app.button)
-    next(t for t in app.text_area if t.label=='Question or observation').set_value('How should task chunking change?').run()
+    next(t for t in app.text_area if t.label=='Question').set_value('How should task chunking change?').run()
     click(app,'Discuss options')
     assert app.session_state['modification_discussion_'+sid]
     click(app,'Draft modifications')
@@ -226,7 +233,8 @@ def test_catalog_option_joins_the_same_draft_queue(workspace,record,original_pdf
     assert any(e.get('catalog_id')=='time_001' for e in review['evidence'])
 
 
-def test_grades_show_assignment_instructor_course_and_filter(platform,record,original_pdf):
+def test_grades_show_assignment_instructor_course_and_filter(platform,record,original_pdf,monkeypatch):
+    monkeypatch.setattr(core,'suggest_updates',lambda *args,**kw:[])
     import integrations as I
     sid,app=ready(record,original_pdf)
     I.sync_sis('powerschool',platform.base)
@@ -254,12 +262,12 @@ def test_grades_show_assignment_instructor_course_and_filter(platform,record,ori
 
 
 def test_batch_draft_submits_once_and_removes_queue(workspace,record,original_pdf,monkeypatch):
+    monkeypatch.setattr(core,'list_supporting_docs',lambda sid:['Progress observation.txt'])
     sid,app=ready(record,original_pdf)
-    monkeypatch.setattr(core,'suggest_updates',lambda student,note:[
+    monkeypatch.setattr(core,'suggest_updates',lambda student,note='',**kw:[
         core._make_change(record,'grade','10','Course evidence','teacher note'),
         core._make_change(record,'profile.needs','A private checkpoint during independent tasks.','Course evidence','teacher note')])
     click(app,'Suggested modifications')
-    next(t for t in app.text_area if t.label=='Question or observation').set_value('Review the plan').run()
     click(app,'Draft modifications');click(app,'Draft modifications')
     assert len(app.session_state['suggestions_'+sid])==2
     click(app,'Send all changes to review')
@@ -294,12 +302,12 @@ def test_workspace_reset_clears_take_data_and_session_confirmations(workspace,re
 
 
 def test_single_send_keeps_other_edits_and_tool(workspace,record,original_pdf,monkeypatch):
+    monkeypatch.setattr(core,'list_supporting_docs',lambda sid:['Progress observation.txt'])
     sid,app=ready(record,original_pdf)
-    monkeypatch.setattr(core,'suggest_updates',lambda student,note:[
+    monkeypatch.setattr(core,'suggest_updates',lambda student,note='',**kw:[
         core._make_change(record,'progress_report_weeks','4','Monitoring','teacher note'),
         core._make_change(record,'profile.needs','A private checkpoint.','Support','teacher note')])
     click(app,'Suggested modifications')
-    next(t for t in app.text_area if t.label=='Question or observation').set_value('Review supports').run()
     click(app,'Draft modifications')
     [t for t in app.text_area if t.label=='Proposed wording'][1].set_value('Keep this unsent wording.').run()
     click(app,'Send change to review')
@@ -356,3 +364,31 @@ import report_dialogs as dialogs
 dialogs.team_reports({sid!r},I.evidence({sid!r}))
 """,default_timeout=60).run()
     assert any(m.value==saved['observation'] for m in app.markdown)
+
+
+def test_prompt_free_drafting_uses_section_and_ignores_old_prompt(platform,record,original_pdf,monkeypatch):
+    import integrations as I
+    sid,app=ready(record,original_pdf)
+    I.sync_sis('powerschool',platform.base)
+    I.link_student(sid,'powerschool','powerschool:stu-001')
+    I.sync_lms(sid,'powerschool:math-9',platform.base)
+    calls=[]
+    monkeypatch.setattr(core,'suggest_updates',lambda student,**kw:calls.append((student,kw)) or [])
+    app.session_state['modification_focus_'+sid]='goals.0.goal old scripted demo prompt'
+    click(app,'Suggested modifications')
+    assert not next(b for b in app.button if b.label=='Draft modifications').disabled
+    assert not any(t.label=='Question or observation' for t in app.text_area)
+    select(app,'Review focus','Annual goals')
+    click(app,'Draft modifications')
+    assert calls==[(sid,{'review_area':'Annual goals'})]
+    assert any('No supported changes' in info.value for info in app.info)
+    assert core.get_iep(sid)==record and not reviews.list_reviews(sid)
+
+
+def test_drafting_without_evidence_points_to_reports(workspace,record,original_pdf):
+    sid,app=ready(record,original_pdf)
+    click(app,'Suggested modifications')
+    assert next(b for b in app.button if b.label=='Draft modifications').disabled
+    assert any('Add a team report' in info.value for info in app.info)
+    click(app,'View or add reports')
+    assert app.session_state['student_section']=='Progress & reports'

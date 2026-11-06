@@ -526,7 +526,10 @@ def course_reports(sid,actor):
             dialogs.team_reports(sid,visible)
         if st.button('Refresh LMS',icon=':material/sync:'):
             dialogs.refresh(sid,context['classes'],course_filter,generation)
-        if st.button('Draft from reports',type='primary',icon=':material/edit_note:',disabled=not items):navigate(sid,'Modifications')
+        if st.button('Draft from reports',type='primary',icon=':material/edit_note:',disabled=not items):
+            st.session_state['modification_review_area_'+sid]='Whole IEP'
+            st.session_state['draft_from_reports_'+sid]=True
+            navigate(sid,'Modifications')
         with st.popover('Export',icon=':material/download:'):
             st.download_button('Download reports',json.dumps(visible,indent=2),'course-evidence.json','application/json',
                                icon=':material/download:',help='Export assignment results and reports for the current course filter.')

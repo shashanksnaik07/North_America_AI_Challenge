@@ -87,50 +87,56 @@ def save_form(new_iep: dict, section: str, sid: str, teacher: str) -> None:
 
 
 def modifications(sid, teacher=''):
-    """One shared focus, discussion and candidate queue, followed by human review."""
+    """Evidence-first drafting, optional discussion, and one human-review queue."""
     import integrations as I
     import workspace_design as D
     queue='suggestions_'+sid
     st.session_state.setdefault(queue,[])
-    st.caption('Describe a concern or ask a question, explore possible supports, then send selected changes to review.')
+    st.caption('Review suggested changes based on the current IEP, course feedback and team reports.')
     pending=reviews.list_reviews(sid,open_only=True)
     if pending:
         st.info(f"{len(pending)} saved {'draft is' if len(pending)==1 else 'drafts are'} ready to compare.")
         if st.button('Review saved drafts',width='stretch',icon=':material/edit_note:'): D.navigate(sid,'Review')
-    context_key='modification_focus_'+sid
-    focus=st.text_area('Question or observation',key=context_key,persist_state='session',height=120,
-                       placeholder='For example: what should change when a support helps in one course but is unavailable in another?')
-    with st.expander('Plan, reports and supporting information'):
-        evidence=I.evidence(sid)
-        st.caption(f'{len(evidence)} course evidence records · {len(core.list_supporting_docs(sid))} supporting files')
+    evidence=I.evidence(sid)
+    files=core.list_supporting_docs(sid)
+    st.caption(f'{len(evidence)} reports & assignment results · {len(files)} supporting files')
+    requested=st.session_state.pop('draft_from_reports_'+sid,False)
+    area=st.selectbox('Review focus',list(core.REVIEW_AREAS),key='modification_review_area_'+sid,persist_state='session',
+                      help='Review the whole IEP or narrow suggestions to one section. All available student evidence is considered.')
+    if not evidence and not files: st.info('Add a team report, refresh LMS feedback, or attach a supporting document before drafting.')
+    draft=st.button('Draft modifications',type='primary',disabled=not (evidence or files),width='stretch',icon=':material/auto_fix_high:')
+    if st.button('View or add reports',width='stretch',icon=':material/comment:'):
+        st.session_state['pending_student_section']='Progress & reports';st.rerun()
+    with st.expander('Evidence used'):
         if evidence: D.evidence_cards(evidence)
-        else: st.caption('Add classroom reports in Progress & reports, or documents in Documents.')
-    left,right=st.columns(2)
-    if left.button('Discuss options',disabled=not focus.strip(),width='stretch',icon=':material/forum:'):
-        with st.spinner('Reading the plan and supporting context...'):
-            result=run_safely(core.answer,sid,focus.strip())
-        if result:
-            st.session_state.setdefault('modification_discussion_'+sid,[]).insert(0,(focus,*result))
-    if right.button('Draft modifications',type='primary',disabled=not focus.strip(),width='stretch',icon=':material/auto_fix_high:'):
+        for name in files: st.caption(name)
+        if not evidence and not files: st.caption('No reports or supporting documents yet.')
+    if (draft or requested) and (evidence or files):
         context=drafting.basis(sid)
         with st.spinner('Drafting changes from the plan and evidence...'):
-            new=run_safely(core.suggest_updates,sid,focus.strip())
+            new=run_safely(core.suggest_updates,sid,review_area=area)
         if new:
             # Capture before the model call; never stamp a late response as fresh.
             new=[item if '_generation' in item else {**item,**context} for item in new]
             st.session_state[queue]=drafting.merge(st.session_state[queue],new)
-        elif new==[]: st.info('No supported changes were identified. Add a more specific observation or review the missing evidence.')
-    for question,answer,docs in st.session_state.get('modification_discussion_'+sid,[]):
-        with st.expander('Discussion: '+question[:75],expanded=True):
-            st.write(answer)
+        elif new==[]: st.info('No supported changes were identified in this section. The current IEP is unchanged.')
+    with st.expander('Discuss the evidence (optional)'):
+        question=st.text_area('Question',key='modification_question_'+sid,persist_state='session',height=85,
+                              placeholder='For example: how does participation differ between courses?')
+        if st.button('Discuss options',disabled=not question.strip(),width='stretch',icon=':material/forum:'):
+            with st.spinner('Reading the plan and supporting context...'):
+                result=run_safely(core.answer,sid,question.strip())
+            if result: st.session_state.setdefault('modification_discussion_'+sid,[]).insert(0,(question,*result))
+        st.caption('Questions help interpret the evidence. Record new observations in Progress & reports.')
+        for question,answer,docs in st.session_state.get('modification_discussion_'+sid,[]):
+            st.markdown('**'+question+'**');st.write(answer)
             if docs:
-                with st.expander('Sources used in this discussion'):
+                with st.expander('Sources: '+question[:60]):
                     for text,metadata in docs: st.caption(metadata.get('source','Document'));st.text(text)
-            st.caption('Discussion does not change the IEP. Draft modifications uses your focus and source evidence.')
     with st.expander('Explore accommodation options'):
-        st.caption('Reference options for this discussion. Catalog evidence ratings are not independently verified.')
+        st.caption('Reference options for this student. Catalog evidence ratings are not independently verified.')
         if st.button('Find relevant options',width='stretch',icon=':material/search:'):
-            st.session_state['modification_options_'+sid]=run_safely(core.recommend_accommodations,sid,focus,k=15) or []
+            st.session_state['modification_options_'+sid]=run_safely(core.recommend_accommodations,sid,'' if area=='Whole IEP' else area,k=15) or []
         options=st.session_state.get('modification_options_'+sid,[])
         if options:
             chosen=st.selectbox('Accommodation option',options,format_func=lambda a:a['name'],key='modification_catalog_'+sid)
@@ -143,7 +149,6 @@ def modifications(sid, teacher=''):
                 suggestion=core.accommodation_to_suggestion(sid,chosen)
                 suggestion['payload'].update(frequency=frequency.strip(),amount=amount.strip(),location=location.strip())
                 suggestion['reason']='Reference option selected for team review. '+chosen.get('description','')
-                suggestion['teacher_note']=focus
                 suggestion['evidence']=I.evidence(sid)+[{'source':'Accommodation catalog','text':chosen.get('description',''),'catalog_id':chosen.get('id'),'evidence_verified':False}]
                 st.session_state[queue]=drafting.merge(st.session_state[queue],[suggestion])
                 st.success('Option added below. Edit its wording and send it for review.')

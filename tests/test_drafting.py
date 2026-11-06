@@ -111,6 +111,44 @@ def test_reset_blocks_a_decision_from_an_old_session(workspace,record,original_p
     assert core.get_iep(sid)==record and R.get(rid)['status']=='pending'
 
 
+def test_evidence_only_drafting_retrieves_documents_and_enforces_section(workspace,record,original_pdf,monkeypatch):
+    sid=student(record,original_pdf)
+    queries=[]
+    def context(student,query):
+        queries.append(query)
+        return '',[('The student resumes independent work when the next step is written down.',{'source':'Progress report.txt'})]
+    monkeypatch.setattr(core,'_context',context)
+    monkeypatch.setattr(core,'recommend_accommodations',lambda *a,**kw:[])
+    proposed='Use the written next step to resume the task in four of five sessions.'
+    monkeypatch.setattr(core,'_chat_json',lambda *a,**kw:{'suggestions':[
+        {'action':'change','field':'goals.0.goal','new_value':proposed,'reason':'Written next steps supported resumption [D1].','source':'D1'},
+        {'action':'change','field':'progress_report_weeks','new_value':'4','reason':'Out of scope','source':'D1'},
+        {'action':'add_service','category':'supplementary_aids','service':'Duplicate support','source':'D1'},
+    ]})
+    suggestions=core.suggest_updates(sid,review_area='Annual goals')
+    assert queries and 'Annual goals' in queries[0]
+    assert len(suggestions)==1 and suggestions[0]['field']=='goals.0.goal'
+    assert suggestions[0]['teacher_note']=='' and suggestions[0]['evidence'][0]['citation']=='D1'
+    assert core.get_iep(sid)==record and not R.list_reviews(sid)
+
+
+def test_no_evidence_does_not_invent_a_draft(workspace,record,original_pdf,monkeypatch):
+    sid=student(record,original_pdf)
+    monkeypatch.setattr(core,'_chat_json',lambda *a,**kw:pytest.fail('Do not call the model without evidence'))
+    assert core.suggest_updates(sid)==[]
+
+
+def test_already_addressed_evidence_is_a_normal_empty_result(workspace,record,original_pdf,monkeypatch):
+    sid=student(record,original_pdf)
+    monkeypatch.setattr(core,'_context',lambda *a:('',[('Current support remains appropriate.',{'source':'Report.txt'})]))
+    monkeypatch.setattr(core,'recommend_accommodations',lambda *a,**kw:[])
+    monkeypatch.setattr(core,'_chat_json',lambda *a,**kw:{'suggestions':[
+        {'action':'change','field':'goals.0.goal','new_value':record['goals'][0]['goal'],'source':'D1'},
+    ]})
+    assert core.suggest_updates(sid,review_area='Annual goals')==[]
+    assert core.get_iep(sid)==record and not R.list_reviews(sid)
+
+
 def test_continuation_keeps_native_form_values_and_original_bytes(workspace,record):
     import io
     import pymupdf as fitz
