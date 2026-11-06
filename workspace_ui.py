@@ -27,6 +27,14 @@ def attempt(fn, *args, **kwargs):
 def notice(message):
     st.session_state['flash'] = message; st.rerun()
 
+
+def name_choice(label, names, key, preferred=None):
+    choices=list(names)
+    if preferred and preferred not in choices: choices.insert(0,preferred)
+    index=choices.index(preferred) if preferred in choices else 0 if choices else None
+    return st.selectbox(label,choices,index=index,key=key,accept_new_options=True,
+                        placeholder='Choose or type a name',persist_state='session') or ''
+
 def typed_value(label, value, key):
     if isinstance(value, bool) or value is None:
         choice = st.selectbox(label, ['Unanswered', 'Yes', 'No'], index=0 if value is None else 1 if value else 2, key=key, persist_state='session')

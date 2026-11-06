@@ -1,6 +1,7 @@
 """Document side-panel tools extracted from the original app."""
 import copy
 import json
+import time
 from functools import partial
 from uuid import uuid4
 import pandas as pd
@@ -11,6 +12,27 @@ import iep_schema as S
 import workspace_ui as U
 import reviews
 import drafting
+
+SUBMITTED_NOTICE_SECONDS=3.0
+
+
+@st.fragment(run_every=.5)
+def submitted_option(sid, draft_id):
+    """Expire just the receipt, keeping other editable options and the current tool."""
+    queue='suggestions_'+sid
+    item=next((item for item in st.session_state.get(queue,[]) if item.get('_draft_id')==draft_id),None)
+    if item is None: return
+    if time.monotonic()-item['_submitted_at']>=SUBMITTED_NOTICE_SECONDS:
+        st.session_state[queue]=[item for item in st.session_state[queue] if item.get('_draft_id')!=draft_id]
+        return
+    with st.container(border=True):
+        st.success('Submitted for review',icon=':material/check_circle:')
+        st.caption(item['section'])
+
+
+def mark_submitted(items):
+    for item in items: item['_submitted_at']=time.monotonic()
+    st.rerun()
 
 
 def run_safely(fn, *args, **kwargs):
@@ -128,6 +150,9 @@ def modifications(sid, teacher=''):
     if st.session_state[queue]: st.markdown('**Draft changes**')
     for i,suggestion in enumerate(list(st.session_state[queue])):
         draft_id=suggestion.setdefault('_draft_id',uuid4().hex)
+        if '_submitted_at' in suggestion:
+            submitted_option(sid,draft_id)
+            continue
         with st.container(border=True):
             st.markdown('**'+suggestion['section']+'**')
             st.caption('Current wording');st.write(suggestion.get('current_text') or 'New plan item')
@@ -143,15 +168,16 @@ def modifications(sid, teacher=''):
             if st.button('Send change to review',key=f'modification_submit_{sid}_{draft_id}',type='primary',disabled=not wording.strip(),width='stretch',icon=':material/rate_review:'):
                 result=run_safely(core.apply_suggestion,sid,{**suggestion,'suggested_text':wording},teacher)
                 if result:
-                    st.session_state[queue].pop(i);flash(result);D.navigate(sid,'Review')
+                    mark_submitted([suggestion])
             if st.button('Discard option',key=f'modification_discard_{sid}_{draft_id}',icon=':material/close:'):
                 st.session_state[queue].pop(i);st.rerun()
-    if len(st.session_state[queue])>1:
+    active=[item for item in st.session_state[queue] if '_submitted_at' not in item]
+    if len(active)>1:
         st.caption('Send related changes together so the team can review and approve one complete draft.')
         if st.button('Send all changes to review',icon=':material/playlist_add_check:',type='primary',width='stretch'):
-            result=run_safely(drafting.submit,sid,st.session_state[queue],teacher)
+            result=run_safely(drafting.submit,sid,active,teacher)
             if result:
-                st.session_state[queue]=[];flash(result);D.navigate(sid,'Review')
+                mark_submitted(active)
 
 
 def form(student_id, teacher=""):

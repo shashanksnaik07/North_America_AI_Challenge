@@ -40,7 +40,7 @@ def test_pdf_edit_review_confirmation_workflow(workspace, record, original_pdf):
     assert len(reviews.list_reviews(sid,open_only=True))==1
     click(app,'Continue to decision')
     assert next(b for b in app.button if b.label=='Approve changes').disabled
-    next(t for t in app.text_input if t.label=='Reviewer name').set_value('UI Reviewer').run()
+    assert next(t for t in app.selectbox if t.label=='Reviewer name').value==record['meta']['case_manager']
     assert next(b for b in app.button if b.label=='Approve changes').disabled
     next(c for c in app.checkbox if c.label.startswith('I checked the source')).check().run()
     click(app,'Approve changes')
@@ -99,7 +99,7 @@ def test_report_to_suggestion_navigation(platform,record,original_pdf):
     I.submit_report(sid,'powerschool:math-9','Demo Teacher','Extended time','Sometimes','Mixed','Observed completion varies.','2026-10-01','2026-10-31')
     app.session_state['main_navigation']='Student workspace'
     app.session_state['student_section']='Progress & reports';app.run()
-    click(app,'Use these reports to draft an update')
+    click(app,'Draft from reports')
     assert app.session_state['main_navigation']=='Student workspace'
     assert app.session_state['active_tool_'+sid]=='Modifications'
     assert any(b.label=='Draft modifications' for b in app.button)
@@ -141,10 +141,10 @@ def test_escalated_review_explains_disabled_decision(workspace,record,original_p
     reviews.escalate(rid,'Teacher','Check source','Assigned Specialist','Specialist')
     app.run()
     click(app,'Review drafts (1)');click(app,'Continue to decision')
-    next(t for t in app.text_input if t.label=='Reviewer name').set_value('Assigned Specialist').run()
     next(c for c in app.checkbox if c.label.startswith('I checked the source')).check().run()
     assert next(b for b in app.button if b.label=='Approve changes').disabled
     select(app,'Reviewer role','Specialist')
+    assert next(t for t in app.selectbox if t.label=='Reviewer name').value=='Assigned Specialist'
     assert not next(b for b in app.button if b.label=='Approve changes').disabled
     assert reviews.get(rid)['status']=='escalated'
 
@@ -249,7 +249,7 @@ def test_grades_show_assignment_instructor_course_and_filter(platform,record,ori
     assert len(grades)==1 and grades.iloc[0]['Course']=='Algebra I'
     math_comment=next(r['observation'] for r in I.evidence(sid) if r['course']=='Algebra I')
     assert [m.value for m in app.markdown].count(math_comment)==1
-    click(app,'Use these reports to draft an update')
+    click(app,'Draft from reports')
     assert app.session_state['active_tool_'+sid]=='Modifications'
 
 
@@ -264,6 +264,12 @@ def test_batch_draft_submits_once_and_removes_queue(workspace,record,original_pd
     assert len(app.session_state['suggestions_'+sid])==2
     click(app,'Send all changes to review')
     assert len(reviews.list_reviews(sid))==1
+    assert app.session_state['active_tool_'+sid]=='Modifications'
+    assert all('_submitted_at' in item for item in app.session_state['suggestions_'+sid])
+    assert len(app.success)==2
+    for item in app.session_state['suggestions_'+sid]: item['_submitted_at']-=10
+    app.run()
+    assert not app.exception,app.exception
     assert not app.session_state['suggestions_'+sid]
     assert core.get_iep(sid)==record
 
@@ -285,3 +291,68 @@ def test_workspace_reset_clears_take_data_and_session_confirmations(workspace,re
     assert 'suggestions_'+sid not in app.session_state
     assert 'reviewer_name' not in app.session_state
     assert not app.exception
+
+
+def test_single_send_keeps_other_edits_and_tool(workspace,record,original_pdf,monkeypatch):
+    sid,app=ready(record,original_pdf)
+    monkeypatch.setattr(core,'suggest_updates',lambda student,note:[
+        core._make_change(record,'progress_report_weeks','4','Monitoring','teacher note'),
+        core._make_change(record,'profile.needs','A private checkpoint.','Support','teacher note')])
+    click(app,'Suggested modifications')
+    next(t for t in app.text_area if t.label=='Question or observation').set_value('Review supports').run()
+    click(app,'Draft modifications')
+    [t for t in app.text_area if t.label=='Proposed wording'][1].set_value('Keep this unsent wording.').run()
+    click(app,'Send change to review')
+    assert app.session_state['active_tool_'+sid]=='Modifications'
+    assert any(s.value=='Submitted for review' for s in app.success)
+    assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Keep this unsent wording.'
+    app.session_state['suggestions_'+sid][0]['_submitted_at']-=10
+    app.run()
+    assert not app.exception,app.exception
+    assert app.session_state['active_tool_'+sid]=='Modifications'
+    assert len(app.session_state['suggestions_'+sid])==1
+    assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Keep this unsent wording.'
+    assert len(reviews.list_reviews(sid))==1 and core.get_iep(sid)==record
+
+
+def test_report_dialog_defaults_follow_role_and_course(platform,record,original_pdf):
+    import integrations as I
+    import student_team as Team
+    sid,app=ready(record,original_pdf)
+    I.sync_sis('powerschool',platform.base)
+    I.link_student(sid,'powerschool','powerschool:stu-001')
+    for course in ['math-9','english-9']: I.sync_lms(sid,'powerschool:'+course,platform.base)
+    app.session_state['student_section']='Progress & reports';app.run()
+    assert not any(t.label=='Examples and observations' for t in app.text_area)
+    assert not app.expander
+    click(app,'Add report')
+    assert next(s for s in app.selectbox if s.label=='Your name').value==Team.names(sid,'Parent / caregiver')[0]
+    # AppTest performs full-script runs, so mount the dialog directly to exercise
+    # changes that the browser executes as fragment-only runs.
+    app=AppTest.from_string(f"""
+import integrations as I
+import report_dialogs as dialogs
+dialogs.add_report({sid!r},I.student_context({sid!r})['classes'],'All courses','initial')
+""",default_timeout=60).run()
+    select(app,'Your role','Teacher')
+    math=next(s for s in app.selectbox if s.label=='Your name').value
+    assert math==Team.names(sid,'Teacher','powerschool:math-9')[0]
+    courses=I.student_context(sid)['classes']
+    english=next(c for c in courses if c['sourcedId']=='powerschool:english-9')
+    select(app,'Course',english)
+    assert next(s for s in app.selectbox if s.label=='Your name').value==Team.names(sid,'Teacher','powerschool:english-9')[0]
+    assert next(s for s in app.selectbox if s.label=='Your name').value!=math
+    select(app,'Your role','Case manager')
+    assert next(s for s in app.selectbox if s.label=='Your name').value==record['meta']['case_manager']
+    next(t for t in app.text_input if t.label=='Accommodation used').set_value('Written cue')
+    next(t for t in app.text_area if t.label=='Examples and observations').set_value('Returned to the written next step.')
+    click(app,'Save report')
+    saved=next(r for r in I.evidence(sid) if r['kind']=='report')
+    assert saved['reporter']==record['meta']['case_manager']
+    assert saved['reporter_role']=='Case manager' and saved['course_id']=='powerschool:english-9'
+    app=AppTest.from_string(f"""
+import integrations as I
+import report_dialogs as dialogs
+dialogs.team_reports({sid!r},I.evidence({sid!r}))
+""",default_timeout=60).run()
+    assert any(m.value==saved['observation'] for m in app.markdown)

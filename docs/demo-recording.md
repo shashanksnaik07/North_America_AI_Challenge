@@ -23,7 +23,7 @@ The first snapshot/reset may take longer because it verifies the archived PDFs. 
 ## Main sequence: Ellis Brook
 
 1. Open Ellis, then **Progress & reports**. Show the course filter, grades and named instructors. Mathematics / Emily Harper has **72/100** for *Multi-step problem solving* and **80/100** for *Independent practice review*. English language arts / Daniel Reed has **70/100** for *Reading response* and **74/100** for *Written explanation*. Select each assignment row to read its full instructor comment below the table: mathematics had segmented work, a checkpoint and a break; English had extra time without segmentation. These are assignment results, not course averages or proof of a support's effect.
-2. Optional family-report entry: expand **Add a classroom report** and enter the values below. Choose **Save report**. Teacher feedback in this sequence remains sourced from graded LMS assignments.
+2. Optional family-report entry: click **Add report** to open the dialog and enter the values below. **Parent / caregiver** and **Alex Brook** are preselected; names remain editable. Choose **Save report**. Use **Team reports** to browse family/student observations or their accommodation summary. **Refresh LMS** opens a separate course refresh dialog. Teacher feedback in this sequence remains sourced from graded LMS assignments.
 
    | Field | Mock input |
    | --- | --- |
@@ -37,20 +37,20 @@ The first snapshot/reset may take longer because it verifies the archived PDFs. 
    | Reporting period ends | 2026-10-30 |
    | Examples and observations | During four homework sessions, Ellis restarted after a planned break when the next step was written down. On one session without the written cue, Ellis needed repeated reminders. Please compare these observations with course assignment comments before changing the plan. |
 
-3. Click **Use these reports to draft an update**. In **Question or observation**, paste:
+3. Click **Draft from reports**. In **Question or observation**, paste:
 
-   > Using the Mathematics and English language arts assignment comments, revise the first supplementary aid to specify short work segments, a private checkpoint and a return-to-task cue during independent work. Change the progress-report interval from six to four weeks. Preserve the annual goals. Do not infer that supports caused the grades.
+   > Using the Mathematics and English language arts assignment comments, clarify the existing Planning and self-monitoring annual goal (goals.0.goal) by naming a written return-to-task cue after the planned break. Keep the plan review date, three work segments, four of five sessions criterion, and current mastery date. Do not change service/accommodation rows or add a new goal. Also change progress_report_weeks from six to four weeks. Do not infer that supports caused the grades.
 
-4. Click **Draft modifications**. The tested local Qwen model returned two options in approximately 13 seconds. Timing and wording can vary. Review the reason and proposed wording for each option. The intended fields are `progress_report_weeks` and `services.supplementary_aids.rows.0.service`. For consistent narration, use **4** and:
+4. Click **Draft modifications**. Timing and wording can vary. Review the reason and proposed wording for each option. The intended fields are `progress_report_weeks` and `goals.0.goal`. The existing annual-goal box on original PDF page **5** gives this concise clarification more room than the supplementary-aids table and retains the measurable goal criteria. For consistent narration, use **4** and:
 
-   > Break independent work into short segments, offer a private checkpoint, and use a return-to-task cue.
+   > By the plan review date, Ellis will use a short task plan, a planned break and a written return-to-task cue to complete and check three work segments in four of five sessions.
 
-   If the model offers unrelated options, discard them. If it adds a service instead of editing the existing one, use the deterministic Edit draft workflow below to avoid adding a duplicate support.
+   If the model offers unrelated options, discard them. For a deterministic fallback, open **Edit draft → Annual goals**, choose the existing goal's wording field (`goals.0.goal`), paste the text above, and **Save for review**. Leave the mastery date unchanged.
 
-5. Click **Send all changes to review**. This creates one review for the related changes; the current plan is still unchanged. In **Compare**, select each changed field and click **Show this field on PDF**. Show the red strike-through and green additions. **View → Form** shows the equivalent record differences. Scroll the PDF or use its page controls to inspect all relevant pages, including linked additional details.
-6. Choose **Continue to decision**. Enter **Morgan Lee** as **Reviewer name**, select **Case manager**, and add this optional decision note:
+5. Click **Send all changes to review**. This creates one review for the related changes; the current plan is still unchanged. Each submitted option shows **Submitted for review** for about three seconds and then clears. You stay on **Suggested modifications**. Individual **Send change to review** buttons behave the same way and leave other options editable. When ready, open **Review drafts** yourself. In **Compare**, select each changed field and click **Show this field on PDF**. Show the red strike-through and green additions in the annual-goal box on page **5**. **View → Form** shows the equivalent record differences. Scroll the PDF or use its page controls to inspect the reporting interval too.
+6. Choose **Continue to decision**. Keep **Case manager** and the preselected **Sarah Patel** as **Reviewer name**, and add this optional decision note:
 
-   > Compared both courses' graded assignment comments and the student/family observations. Approved clearer delivery conditions and four-week progress monitoring. The team will review implementation across courses.
+   > Compared both courses' graded assignment comments and the student/family observations. Clarified the return-to-task cue while retaining the goal's measurable criteria, and approved four-week progress monitoring. The team will review implementation across courses.
 
 7. Check **I checked the source, changes, findings and any added pages.** Click **Approve changes**. Show the approval message, then **View IEP** and **Documents → IEP history**. There should be one additional earlier version for this combined approval; earlier template-preparation versions are retained. Downloading **Current IEP** exports the plan; the red/green markup is the review visualization.
 
@@ -59,20 +59,20 @@ The first snapshot/reset may take longer because it verifies the archived PDFs. 
 1. Open Gray. Confirm there are no saved drafts. Show **Progress & reports**: mathematics has accessible text and an organizer; English comments say accessible text arrived late. Those differences motivate clearer implementation and monitoring.
 2. Open **IEP → Edit draft**. Select **Additional information** and choose the progress-report interval field (`progress_report_weeks`). Replace **6** with **4**. In the full Form editor, this field is under **Special factors**.
 3. Click **Save for review**, then **Show this field on PDF**. Compare the red **6** and green **4**; switch **View → Form** to show the same change.
-4. Continue to decision as **Morgan Lee / Case manager**, check the review confirmation, and approve. This route is useful if the model is unavailable or you need a short, predictable take.
+4. Continue to decision using the preselected associated **Case manager** name, check the review confirmation, and approve. This route is useful if the model is unavailable or you need a short, predictable take.
 
 Optional accommodation-library clip: in **Suggested modifications**, enter **Make a graphic organizer available at the start of English writing tasks**, expand **Explore accommodation options**, and choose **Find relevant options**. Select **Graphic Organizers for Writing** if offered. Enter **At the start of each independent writing task**, **One organizer and a two-minute planning check**, and **English language arts**, then **Add option to draft**. Edit/review the delivery details before submitting. Explain that this is an alternative draft, and discard it if it duplicates Gray's existing support. Do not approve a redundant service merely for the recording.
 
 ## Human escalation: Logan Sage
 
 1. Open Logan's existing **Review: Challenge with access** draft. Compare the changed needs, support wording and reporting interval. Use **Information behind this change** to show the course and family/student evidence.
-2. Choose **Continue to decision**. Enter **Morgan Lee / Case manager**.
-3. Expand **Request another reviewer**. Enter **Jamie Chen** in **Reviewer to assign**, select **Specialist**, and paste this reason:
+2. Choose **Continue to decision**. Keep the associated **Case manager** name.
+3. Expand **Request another reviewer**. Keep **Specialist** and **Jamie Chen** in **Reviewer to assign**, and paste this reason:
 
    > Verify that the proposed project-planning support preserves advanced content and addresses the missed checkpoints when collaboration roles were unclear. Compare the Mathematics and English language arts assignment comments before a decision.
 
 4. Click **Assign review**. Show **Specialist review needed**. Return to **Decide** if needed. The case manager cannot approve this assigned specialist review.
-5. To demonstrate completion, enter **Jamie Chen**, select **Specialist**, inspect the differences and added pages, check the review confirmation and approve. Alternatively choose **Reject this draft** to demonstrate retaining the current plan. Assignment is recorded in the local inbox; it does not send email.
+5. To demonstrate completion, select **Specialist**; the assigned **Jamie Chen** name is preselected. Inspect the differences and added pages, check the review confirmation and approve. Alternatively choose **Reject this draft** to demonstrate retaining the current plan. Assignment is recorded in the local inbox; it does not send email. Prefilled names do not bypass the explicit review confirmation.
 
 ## Technical setup and recovery
 

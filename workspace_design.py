@@ -1,6 +1,5 @@
 """Task-oriented presentation; all persistence and approval rules stay in services."""
 import copy
-import datetime as dt
 from html import escape
 import json
 import uuid
@@ -321,8 +320,13 @@ def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imp
             st.success('This review is complete. The activity log records the decision.')
         else:
             st.caption('Approval updates the student’s plan and keeps its previous version.')
-            reviewer=st.text_input('Reviewer name',key='reviewer_name',persist_state='session')
+            import student_team as Team
             reviewer_role=st.selectbox('Reviewer role',R.ROLES,key='reviewer_role',persist_state='session')
+            preferred=item['assignee'] if item['assignee'] and reviewer_role==item['required_role'] else None
+            reviewer=U.name_choice('Reviewer name',Team.names(sid,reviewer_role,record=item['candidate']),
+                                   f'reviewer_name_{sid or rid}_{reviewer_role}',preferred=preferred)
+            st.session_state['reviewer_name']=reviewer
+            if sid: st.session_state['active_reviewer_'+sid]=reviewer
             if item['status']=='escalated': st.info('Required role: '+item['required_role']+(('. Assigned to '+item['assignee']+'.') if item['assignee'] else '.'))
             st.caption('Names and roles are self-selected in this local demo.')
             confirmed=st.checkbox('I checked the source, changes, findings and any added pages.',key=scope+'_confirm')
@@ -344,8 +348,8 @@ def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imp
                 try: R.decide(rid,'rejected',reviewer,reviewer_role,note=note,revision=item['revision'],expected_generation=generation);U.notice('Draft rejected. The student’s plan is unchanged.')
                 except Exception as exc: st.error(str(exc))
             with st.expander('Request another reviewer'):
-                assignee=st.text_input('Reviewer to assign',key=scope+'_assignee')
                 required=st.selectbox('Role needed',R.ROLES,index=1,key=scope+'_role')
+                assignee=U.name_choice('Reviewer to assign',Team.names(sid,required,record=item['candidate']),scope+'_assignee_'+required)
                 reason=st.text_area('What needs their attention?',key=scope+'_reason')
                 if st.button('Assign review',key=scope+'_escalate',icon=':material/person_add:'):
                     try: R.escalate(rid,reviewer,reason,assignee,required);U.notice('Review assigned in the local inbox.')
@@ -502,8 +506,8 @@ def connections(sid,actor):
         st.download_button('Export canonical IEP data',json.dumps(O.canonical(core.get_iep(sid),sid,evidence=I.evidence(sid)),indent=2),'iep-canonical.json','application/json',icon=':material/download:')
 
 def course_reports(sid,actor):
+    import report_dialogs as dialogs
     st.subheader('Grades & course feedback')
-    st.caption('Review assignment grades and instructor comments alongside student and family reports.')
     context=I.student_context(sid)
     if not context or not context['classes']:
         st.info('Connect a school roster to choose the student’s courses.')
@@ -511,8 +515,22 @@ def course_reports(sid,actor):
             st.session_state['setup_section']='Connections';st.rerun()
         return
     items=I.evidence(sid)
-    course_filter=st.selectbox('Filter by course',['All courses']+[c['title'] for c in context['classes']],key='evidence_course_'+sid)
-    visible=[r for r in items if course_filter=='All courses' or r.get('course')==course_filter]
+    with st.container(horizontal=True,vertical_alignment='bottom'):
+        course_filter=st.selectbox('Filter by course',['All courses']+[c['title'] for c in context['classes']],key='evidence_course_'+sid,width=230)
+        visible=[r for r in items if course_filter=='All courses' or r.get('course')==course_filter]
+        direct=[r for r in visible if r['kind']=='report']
+        generation=st.session_state.get('workspace_generation')
+        if st.button('Add report',icon=':material/add_comment:'):
+            dialogs.add_report(sid,context['classes'],course_filter,generation)
+        if st.button(f'Team reports ({len(direct)})',icon=':material/groups:'):
+            dialogs.team_reports(sid,visible)
+        if st.button('Refresh LMS',icon=':material/sync:'):
+            dialogs.refresh(sid,context['classes'],course_filter,generation)
+        if st.button('Draft from reports',type='primary',icon=':material/edit_note:',disabled=not items):navigate(sid,'Modifications')
+        with st.popover('Export',icon=':material/download:'):
+            st.download_button('Download reports',json.dumps(visible,indent=2),'course-evidence.json','application/json',
+                               icon=':material/download:',help='Export assignment results and reports for the current course filter.')
+            st.caption('Assignment results are context, not a measure of accommodation effectiveness. Dates are shown only when supplied by the platform. Suggested modifications considers all available student evidence.')
     graded=[r for r in visible if r['kind']=='lti_result']
     st.markdown('**LMS assignments**')
     if graded:
@@ -526,6 +544,7 @@ def course_reports(sid,actor):
         result_key=P.digest(json.dumps([r['id'] for r in graded]).encode())[:12]
         selected=st.dataframe(rows,hide_index=True,width='stretch',on_select='rerun',
             selection_mode='single-row',selection_default={'selection':{'rows':[0]}},
+            height=min(260,36+35*len(rows)),
             key='assignment_grades_'+sid+'_'+result_key)
         if selected.selection.rows:
             feedback=graded[selected.selection.rows[0]]
@@ -534,40 +553,4 @@ def course_reports(sid,actor):
                 st.caption(feedback.get('label','Assignment')+' · '+feedback['course'])
                 st.write(feedback.get('observation') or 'No instructor comment was supplied for this assignment.')
                 st.caption('Source: '+feedback.get('source','LMS assignment result'))
-        st.caption('Assignment results are context, not a measure of accommodation effectiveness. Dates are shown only when supplied by the platform.')
     else:st.info('No LMS grades are available for this course selection. Refresh a course to retrieve shared assignments and comments.')
-    direct=[r for r in visible if r['kind']=='report']
-    if direct:
-        with st.expander('Student, family & other reports',expanded=True):evidence_cards(direct)
-    aggregation=I.aggregate_reports(sid,records=visible)
-    if items:
-        if st.button('Use these reports to draft an update',type='primary',icon=':material/edit_note:'):navigate(sid,'Modifications')
-    if aggregation:
-      with st.expander('Accommodation report summary'):
-        for group in aggregation:
-            with st.container(border=True):
-                st.markdown('**'+group['Accommodation']+'**')
-                st.caption(f"{group['Reports']} reports · {group['Courses']}")
-                st.write('Observed outcomes: '+group['Outcomes'])
-                if group['Mixed observations']: st.caption('Observations differ across courses. Review the examples before drawing conclusions.')
-    with st.expander('Add a classroom report',expanded=not bool(aggregation)):
-        with st.form('course_report_'+sid):
-            course=st.selectbox('Course',context['classes'],format_func=lambda c:c['title'])
-            reporter=st.text_input('Your name',value=actor)
-            reporter_role=st.selectbox('Your role',['Teacher','Parent / caregiver','Student','Related service provider','Case manager'])
-            accommodation=st.text_input('Accommodation used',placeholder='For example, extended time')
-            usage=st.selectbox('How often was it used?',['Every opportunity','Most opportunities','Sometimes','Not used'])
-            effectiveness=st.selectbox('What did you observe?',['Helpful','Mixed','Not helpful','Insufficient evidence'])
-            start=st.date_input('Reporting period starts',value=dt.date.today().replace(day=1))
-            end=st.date_input('Reporting period ends',value=dt.date.today())
-            observation=st.text_area('Examples and observations',placeholder='Describe the task, how the accommodation was used, and what you noticed.')
-            if st.form_submit_button('Save report',type='primary',icon=':material/save:'):
-                if U.attempt(I.submit_report,sid,course['sourcedId'],reporter,accommodation,usage,effectiveness,observation,start,end,reporter_role): U.notice('Report saved. It is now available to Suggested modifications.')
-    with st.expander('Refresh course information'):
-        course=st.selectbox('Course to refresh',context['classes'],format_func=lambda c:c['title'])
-        st.caption('Retrieves grades, assignment comments and course membership shared by the connected LMS.')
-        if st.button('Refresh course',icon=':material/sync:'):
-            records=U.attempt(I.sync_lms,sid,course['sourcedId'])
-            if records is not None: U.notice(f'Course refreshed. {len(records)} results available.')
-    st.download_button('Download reports',json.dumps(visible,indent=2),'course-evidence.json','application/json',
-                       icon=':material/download:',help='Export assignment results and reports for the current course filter.')
