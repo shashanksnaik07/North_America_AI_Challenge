@@ -64,6 +64,10 @@ def test_course_reports_aggregate_and_enter_suggestion_prompt(platform, record, 
                         'Completes work with extended time; attention varies by task.', '2026-10-01', '2026-10-31')
     group = I.aggregate_reports(sid)[0]
     assert group['Reports'] == 2 and group['Mixed observations']
+    filtered=I.aggregate_reports(sid,records=[r for r in I.evidence(sid) if r['course']=='Algebra I'])
+    assert len(filtered)==1 and filtered[0]['Reports']==1 and filtered[0]['Courses']=='Algebra I'
+    assert not filtered[0]['Mixed observations']
+    assert I.aggregate_reports(sid,records=[])==[]
     prompts = []
     def chat(system, prompt, **kw):
         prompts.append(prompt)

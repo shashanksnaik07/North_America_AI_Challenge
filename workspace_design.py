@@ -519,16 +519,27 @@ def course_reports(sid,actor):
         rows=[{'Course':r['course'],'Assignment':r.get('label','Assignment'),
                'Grade':f"{r['score']:g} / {r.get('maximum',1):g}" if isinstance(r.get('score'),(int,float)) else 'Not graded',
                'Instructor':r.get('reporter','Author not provided by LMS'),
-               'Date':(r.get('graded_at') or '')[:10] or 'Not supplied','Comment':r.get('observation','')} for r in graded]
-        st.dataframe(rows,hide_index=True,width='stretch')
+               'Date':(r.get('graded_at') or '')[:10] or 'Not supplied'} for r in graded]
+        st.caption('Select an assignment row to read its instructor feedback.')
+        # Row positions refer to this input order, even after browser-side sorting.
+        # A changed course/result set gets a fresh selection instead of reusing an index.
+        result_key=P.digest(json.dumps([r['id'] for r in graded]).encode())[:12]
+        selected=st.dataframe(rows,hide_index=True,width='stretch',on_select='rerun',
+            selection_mode='single-row',selection_default={'selection':{'rows':[0]}},
+            key='assignment_grades_'+sid+'_'+result_key)
+        if selected.selection.rows:
+            feedback=graded[selected.selection.rows[0]]
+            with st.container(border=True):
+                st.markdown('**Instructor feedback**')
+                st.caption(feedback.get('label','Assignment')+' · '+feedback['course'])
+                st.write(feedback.get('observation') or 'No instructor comment was supplied for this assignment.')
+                st.caption('Source: '+feedback.get('source','LMS assignment result'))
         st.caption('Assignment results are context, not a measure of accommodation effectiveness. Dates are shown only when supplied by the platform.')
-        st.markdown('**Instructor feedback by assignment**')
-        evidence_cards([r for r in graded if r.get('observation')])
     else:st.info('No LMS grades are available for this course selection. Refresh a course to retrieve shared assignments and comments.')
     direct=[r for r in visible if r['kind']=='report']
     if direct:
         with st.expander('Student, family & other reports',expanded=True):evidence_cards(direct)
-    aggregation=I.aggregate_reports(sid)
+    aggregation=I.aggregate_reports(sid,records=visible)
     if items:
         if st.button('Use these reports to draft an update',type='primary',icon=':material/edit_note:'):navigate(sid,'Modifications')
     if aggregation:
@@ -558,6 +569,5 @@ def course_reports(sid,actor):
         if st.button('Refresh course',icon=':material/sync:'):
             records=U.attempt(I.sync_lms,sid,course['sourcedId'])
             if records is not None: U.notice(f'Course refreshed. {len(records)} results available.')
-    with st.expander(f'All reports & course evidence ({len(items)})'):
-        evidence_cards(items)
-        st.download_button('Download reports',json.dumps(items,indent=2),'course-evidence.json','application/json',icon=':material/download:')
+    st.download_button('Download reports',json.dumps(visible,indent=2),'course-evidence.json','application/json',
+                       icon=':material/download:',help='Export assignment results and reports for the current course filter.')

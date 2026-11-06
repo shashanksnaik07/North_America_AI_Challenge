@@ -239,9 +239,16 @@ def test_grades_show_assignment_instructor_course_and_filter(platform,record,ori
     assert set(grades['Grade'])=={'78 / 100','86 / 100'}
     assert set(grades['Date'])=={'Not supplied'}
     assert not grades['Instructor'].str.contains('Author not provided').any()
+    assert 'Comment' not in grades.columns
+    comments=[r['observation'] for r in I.evidence(sid) if r['kind']=='lti_result']
+    page_text=[m.value for m in app.markdown]
+    assert sum(page_text.count(comment) for comment in set(comments))==1
+    assert not any(e.label.startswith('All reports & course evidence') for e in app.expander)
     select(app,'Filter by course','Algebra I')
     grades=next(d.value for d in app.dataframe if 'Assignment' in d.value.columns)
     assert len(grades)==1 and grades.iloc[0]['Course']=='Algebra I'
+    math_comment=next(r['observation'] for r in I.evidence(sid) if r['course']=='Algebra I')
+    assert [m.value for m in app.markdown].count(math_comment)==1
     click(app,'Use these reports to draft an update')
     assert app.session_state['active_tool_'+sid]=='Modifications'
 

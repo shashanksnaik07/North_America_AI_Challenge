@@ -180,9 +180,9 @@ def evidence_context(sid, limit_chars=16000):
     if omitted: parts.append(f'{len(omitted)} additional evidence records omitted by the context budget; no inference about them is justified.')
     return '\n\n'.join(parts) or 'No connected course evidence.', used, omitted
 
-def aggregate_reports(sid):
+def aggregate_reports(sid, records=None):
     groups = {}
-    for r in evidence(sid):
+    for r in evidence(sid) if records is None else records:
         if r['kind'] != 'report': continue
         key = r['accommodation'].strip().casefold()
         group = groups.setdefault(key, {'Accommodation': r['accommodation'], 'Reports': 0, 'Courses': set(), 'Outcomes': set(), 'Usage': set()})

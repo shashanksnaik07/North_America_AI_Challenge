@@ -22,7 +22,7 @@ The first snapshot/reset may take longer because it verifies the archived PDFs. 
 
 ## Main sequence: Ellis Brook
 
-1. Open Ellis, then **Progress & reports**. Show the course filter, grades and named instructors. Mathematics / Emily Harper has **72/100** for *Multi-step problem solving* and **80/100** for *Independent practice review*. English language arts / Daniel Reed has **70/100** for *Reading response* and **74/100** for *Written explanation*. Read the comments: mathematics had segmented work, a checkpoint and a break; English had extra time without segmentation. These are assignment results, not course averages or proof of a support's effect.
+1. Open Ellis, then **Progress & reports**. Show the course filter, grades and named instructors. Mathematics / Emily Harper has **72/100** for *Multi-step problem solving* and **80/100** for *Independent practice review*. English language arts / Daniel Reed has **70/100** for *Reading response* and **74/100** for *Written explanation*. Select each assignment row to read its full instructor comment below the table: mathematics had segmented work, a checkpoint and a break; English had extra time without segmentation. These are assignment results, not course averages or proof of a support's effect.
 2. Optional family-report entry: expand **Add a classroom report** and enter the values below. Choose **Save report**. Teacher feedback in this sequence remains sourced from graded LMS assignments.
 
    | Field | Mock input |
