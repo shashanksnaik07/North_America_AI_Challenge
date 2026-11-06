@@ -1,4 +1,4 @@
-"""Student-centered IEP workspace. Run with streamlit run app.py."""
+"""IEP Bridge. Run with streamlit run app.py."""
 from html import escape
 from pathlib import Path
 import streamlit as st
@@ -7,7 +7,7 @@ import reviews
 import workspace_ui as U
 import workspace_design as Design
 
-st.set_page_config(page_title='IEP workspace', page_icon='📘', layout='wide')
+st.set_page_config(page_title='IEP Bridge', page_icon='📘', layout='wide')
 st.markdown('<style>'+Path(__file__).with_name('ui_style.css').read_text(encoding='utf-8')+'</style>', unsafe_allow_html=True)
 if 'pending_student' in st.session_state:
     st.session_state['student']=st.session_state.pop('pending_student')
@@ -56,7 +56,7 @@ def settings():
                 U.notice('Student removed.')
 
 with st.container(horizontal=True,vertical_alignment='center'):
-    st.markdown('<div class="app-eyebrow">Student support</div><h1>IEP workspace</h1>',unsafe_allow_html=True)
+    st.markdown('<div class="app-eyebrow">Student support</div><h1>IEP Bridge</h1>',unsafe_allow_html=True)
     with st.container(horizontal=True,horizontal_alignment='right'):
         st.markdown('<span class="status-pill">Local demo</span>',unsafe_allow_html=True)
         with st.popover('Tools & setup',icon=':material/settings:'):

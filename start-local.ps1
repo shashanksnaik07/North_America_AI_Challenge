@@ -89,7 +89,7 @@ if ($Background) {
         if ($serverReady) { break }
     }
     if (-not $serverReady) { throw 'Streamlit did not become ready. Check data/runtime/streamlit.stderr.log.' }
-    Write-Host "IEP Assistant is ready at http://127.0.0.1:8501 (PID $($appProcess.Id))."
+    Write-Host "IEP Bridge is ready at http://127.0.0.1:8501 (PID $($appProcess.Id))."
 } else {
     Push-Location $repoDir
     try { & $pythonExe @streamlitArgs } finally { Pop-Location }

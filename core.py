@@ -1,5 +1,5 @@
 """
-core.py - all the AI and storage logic for the IEP Assistant.
+core.py - all the AI and storage logic for IEP Bridge.
 
 - Each student's IEP is stored as structured data following the Alabama IEP
   form (see iep_schema.py) in data/students/<id>/iep.json.
