@@ -40,9 +40,9 @@ def test_stale_proposals_cannot_overwrite_newer_changes(workspace, record, origi
     sid = core.create_student(record); P.save_document(sid, P.archive_source(original_pdf, record, 'source.pdf'))
     a = copy.deepcopy(record); a['grade'] = '10'
     b = copy.deepcopy(record); b['grade'] = '11'
-    first = R.stage_change(sid, a, 'First'); second = R.stage_change(sid, b, 'Second')
+    first = R.stage_change(sid, a, 'First')
+    with pytest.raises(ValueError, match='different wording'): R.stage_change(sid, b, 'Second')
     R.decide(first, 'approved', 'Reviewer', 'Case manager', True)
-    with pytest.raises(ValueError, match='changed after'): R.decide(second, 'approved', 'Reviewer', 'Case manager', True)
     assert core.get_iep(sid)['grade'] == '10'
     assert len(core.list_versions(sid)) == 1
     assert core.list_versions(sid)[0]['document']['sha256'] == P.digest(original_pdf)
@@ -64,7 +64,7 @@ def test_modification_suggestion_only_stages(workspace, record, original_pdf):
     sid = core.create_student(record); P.save_document(sid, P.archive_source(original_pdf, record, 'source.pdf'))
     suggestion = core._make_change(record, 'grade', '10', 'Synthetic', 'teacher note')
     message = core.apply_suggestion(sid, suggestion, 'Teacher')
-    assert 'Submitted' in message and core.get_iep(sid)['grade'] == record['grade']
+    assert 'Added' in message and core.get_iep(sid)['grade'] == record['grade']
     assert len(R.list_reviews(sid, open_only=True)) == 1
 
 def test_diff_escapes_untrusted_html():
@@ -110,10 +110,17 @@ def test_document_only_changes_keep_history_and_block_stale_review(workspace, re
     source = P.archive_source(original_pdf, record, 'original.pdf'); P.save_document(sid, source)
     stale = R.stage_import(record, 'replacement.pdf', original_pdf, 'custom', 'Author', target_sid=sid)
     mapped = P.set_binding(source, 'grade', {'page': 0, 'rect': [40, 200, 300, 240]})
+    with pytest.raises(ValueError, match='pending import'):
+        R.stage_change(sid, record, 'Field location', document=mapped)
+    R.decide(stale, 'rejected', 'Reviewer', 'Case manager')
     rid = R.stage_change(sid, record, 'Field location', document=mapped)
+    with pytest.raises(ValueError, match='working draft'):
+        R.stage_import(record, 'replacement.pdf', original_pdf, 'custom', 'Author', target_sid=sid)
     R.decide(rid, 'approved', 'Reviewer', 'Case manager', True)
     assert core.list_versions(sid)[0]['document'] == source
     assert P.student_document(sid) == mapped
+    stale = R.stage_import(record, 'replacement.pdf', original_pdf, 'custom', 'Author', target_sid=sid)
+    P.save_document(sid, source)
     with pytest.raises(ValueError, match='PDF bindings changed'):
         R.decide(stale, 'approved', 'Reviewer', 'Case manager', True)
 

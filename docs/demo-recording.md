@@ -45,23 +45,23 @@ The first snapshot/reset may take longer because it verifies the archived PDFs. 
 
    > By the plan review date, Ellis will use a short task plan, a planned break and a written return-to-task cue to complete and check three work segments in four of five sessions.
 
-   This text goes in **Proposed wording**, not in a question field. Record new factual observations through **Add report**. **Discuss the evidence (optional)** is available for questions about the existing evidence; a question is never required for drafting.
+   Enter this text in **Proposed wording**, then choose **Save to draft**. Record new factual observations through **Add report**. **Discuss the evidence (optional)** is available for questions about the existing evidence; a question is never required for drafting.
 
-5. Click **Send change to review**, or **Send all changes to review** if you want the team to consider several related changes together. This creates a review; the current plan is still unchanged. Each submitted option shows **Submitted for review** for about three seconds and then clears. You stay on **Suggested modifications**. Individual **Send change to review** buttons behave the same way and leave other options editable. When ready, open **Review drafts** yourself. In **Compare**, select each changed field and click **Show this field on PDF**. Show the red strike-through and green additions in the annual-goal box on page **5**. **View → Form** shows the equivalent record differences.
+5. Click **Add to draft**, or **Add all to draft** if you want the team to consider several related changes together. Each selection updates the same working draft; the current plan is still unchanged. Each submitted option shows **Added to draft** for about three seconds and then clears. You stay on **Suggested modifications**. Individual **Add to draft** buttons behave the same way and leave other options editable. Open **Edit draft** to see the accumulated proposed wording and make any direct corrections; **Save to draft** updates that same draft and stays in the editor. The full **Form** editor also edits this draft. When ready, open **Review draft** yourself. In **Compare**, select each changed field and click **Show this field on PDF**. Show the red strike-through and green additions in the annual-goal box on page **5**. **View → Form** shows the equivalent record differences.
 6. Choose **Continue to decision**. Keep **Case manager** and the preselected **Sarah Patel** as **Reviewer name**, and add this optional decision note:
 
    > Compared both courses' graded assignment comments and the student/family observations. Clarified the return-to-task cue while retaining the goal's measurable criteria. The team will review implementation across courses.
 
-7. Check **I checked the source, changes, findings and any added pages.** Click **Approve changes**. Show the approval message, then **View IEP** and **Documents → IEP history**. There should be one additional earlier version for this combined approval; earlier template-preparation versions are retained. Downloading **Current IEP** exports the plan; the red/green markup is the review visualization.
+7. Check **I checked the source, changes, findings and any added pages.** Click **Approve draft**. Show the approval message, then **View IEP** and **Documents → IEP history**. There should be one additional earlier version for this combined approval; earlier template-preparation versions are retained. Downloading **Current IEP** exports the plan; the red/green markup is the review visualization.
 
 ## Short reliable sequence: Gray Marlow
 
 1. Open Gray. Confirm there are no saved drafts. Show **Progress & reports**: mathematics has accessible text and an organizer; English comments say accessible text arrived late. Those differences motivate clearer implementation and monitoring.
 2. Open **IEP → Edit draft**. Select **Additional information** and choose **Progress Report Weeks**. Replace **6** with **4**. In the full Form editor, this field is under **Special factors**.
-3. Click **Save for review**, then **Show this field on PDF**. Compare the red **6** and green **4**; switch **View → Form** to show the same change.
+3. Click **Save to draft**, then open **Review draft → Show this field on PDF**. Compare the red **6** and green **4**; switch **View → Form** to show the same change.
 4. Continue to decision using the preselected associated **Case manager** name, check the review confirmation, and approve. This route is useful if the model is unavailable or you need a short, predictable take.
 
-Optional accommodation-library clip: in **Suggested modifications**, expand **Explore accommodation options**, and choose **Find relevant options**. Select **Graphic Organizers for Writing** if offered. Enter **At the start of each independent writing task**, **One organizer and a two-minute planning check**, and **English language arts**, then **Add option to draft**. Edit/review the delivery details before submitting. Explain that this is an alternative draft, and discard it if it duplicates Gray's existing support. Do not approve a redundant service merely for the recording.
+Optional accommodation-library clip: in **Suggested modifications**, expand **Explore accommodation options**, and choose **Find relevant options**. Select **Graphic Organizers for Writing** if offered. Enter **At the start of each independent writing task**, **One organizer and a two-minute planning check**, and **English language arts**, then **Add option to draft**. Edit/review the delivery details before submitting. Explain that this is a suggested option, and discard it if it duplicates Gray's existing support. Do not approve a redundant service merely for the recording.
 
 ## Human escalation: Logan Sage
 
@@ -91,3 +91,9 @@ Preparation runs once. It archives only untouched generator-created drafts for E
 ```
 
 Prefer the in-app reset while the app is running. Stop the app before a CLI restore if supporting-document embeddings were changed, then restart it so the embedded vector database reopens cleanly. Snapshot restoration verifies content before modifying records, backs up the current take, and attempts rollback if installation fails.
+
+## One working draft per student
+
+**Add to draft** on a suggestion and **Save to draft** in either editor update the same pending IEP. Neither changes the current approved plan. **Review draft → Approve draft** promotes all pending edits together and saves one previous version. Rejection discards the pending draft without changing the current plan.
+
+Older separate proposals are combined when the student is opened, retaining already approved changes and archiving the original proposals. If two proposals contain different wording for the same field, Review draft presents an explicit choice before approval. A change made in another session invalidates an older review confirmation; reopen and check the updated draft.

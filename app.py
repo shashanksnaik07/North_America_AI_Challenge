@@ -116,6 +116,7 @@ if student_tab.open:
                 with chooser:
                     sid=st.selectbox('Student',list(students),format_func=students.get,key='student',persist_state='session')
                 record=core.get_iep(sid)
+                reviews.working_draft(sid)
                 actor=st.session_state.get('active_reviewer_'+sid) or record['meta'].get('case_manager','')
                 with identity:
                     st.markdown('<div class="student-title">'+escape(record['student_name'])+'</div>',unsafe_allow_html=True)

@@ -39,7 +39,7 @@ def test_review_jump_is_explicit_and_every_page_is_available(workspace, record, 
     P.save_document(sid, document)
     candidate = copy.deepcopy(record); candidate['student_name'] = 'Jordan Updated'
     review_id = reviews.stage_change(sid, candidate, 'Review name', 'Teacher')
-    app.run(); click(app, 'Review drafts (1)')
+    app.run(); click(app, 'Review draft')
     assert len(captured[-1]['pages']) == 2
     assert captured[-1]['highlighted_fields'] == []
     assert [r['path'] for r in captured[-1]['redlines']] == ['student_name']

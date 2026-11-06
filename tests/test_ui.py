@@ -35,15 +35,17 @@ def test_pdf_edit_review_confirmation_workflow(workspace, record, original_pdf):
     click(app,'Edit')
     select(app,'Field','student_name')
     next(t for t in app.text_area if t.label=='Proposed wording').set_value('Jordan Test').run()
-    click(app,'Save for review')
+    click(app,'Save to draft')
     assert core.get_iep(sid)['student_name']=='Jordan Ellis'
     assert len(reviews.list_reviews(sid,open_only=True))==1
+    assert app.session_state['active_tool_'+sid]=='Edit'
+    click(app,'Review draft')
     click(app,'Continue to decision')
-    assert next(b for b in app.button if b.label=='Approve changes').disabled
+    assert next(b for b in app.button if b.label=='Approve draft').disabled
     assert next(t for t in app.selectbox if t.label=='Reviewer name').value==record['meta']['case_manager']
-    assert next(b for b in app.button if b.label=='Approve changes').disabled
+    assert next(b for b in app.button if b.label=='Approve draft').disabled
     next(c for c in app.checkbox if c.label.startswith('I checked the source')).check().run()
-    click(app,'Approve changes')
+    click(app,'Approve draft')
     assert core.get_iep(sid)['student_name']=='Jordan Test'
     assert reviews.list_reviews(sid)[0]['status']=='approved'
     assert P.source_bytes(P.student_document(sid))==original_pdf
@@ -134,8 +136,8 @@ def test_new_import_review_has_its_own_student_context(workspace,record,original
     assert not app.exception,app.exception
     assert any(x.value=='New student import' for x in app.subheader)
     assert not any(s.label=='Student' for s in app.selectbox)
-    assert next(s for s in app.selectbox if s.label=='Change to review').value==rid
-    assert len(next(s for s in app.selectbox if s.label=='Change to review').options)==1
+    assert app.session_state['review_None']==rid
+    assert not any(s.label=='Draft history' for s in app.selectbox)
     assert core.get_iep(sid)['student_name']=='Jordan Ellis'
 
 
@@ -146,12 +148,12 @@ def test_escalated_review_explains_disabled_decision(workspace,record,original_p
     rid=reviews.stage_change(sid,candidate,'Grade change','Teacher')
     reviews.escalate(rid,'Teacher','Check source','Assigned Specialist','Specialist')
     app.run()
-    click(app,'Review drafts (1)');click(app,'Continue to decision')
+    click(app,'Review draft');click(app,'Continue to decision')
     next(c for c in app.checkbox if c.label.startswith('I checked the source')).check().run()
-    assert next(b for b in app.button if b.label=='Approve changes').disabled
+    assert next(b for b in app.button if b.label=='Approve draft').disabled
     select(app,'Reviewer role','Specialist')
     assert next(t for t in app.selectbox if t.label=='Reviewer name').value=='Assigned Specialist'
-    assert not next(b for b in app.button if b.label=='Approve changes').disabled
+    assert not next(b for b in app.button if b.label=='Approve draft').disabled
     assert reviews.get(rid)['status']=='escalated'
 
 
@@ -183,7 +185,7 @@ def test_single_modification_workflow_discussion_to_review(workspace,record,orig
     next(t for t in app.text_area if t.label=='Proposed wording').set_value('Edited support wording retained for review.').run()
     click(app,'View IEP');click(app,'Suggested modifications')
     assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Edited support wording retained for review.'
-    click(app,'Send change to review')
+    click(app,'Add to draft')
     assert len(reviews.list_reviews(sid,open_only=True))==1
     assert reviews.list_reviews(sid)[0]['candidate']['profile']['needs']=='Edited support wording retained for review.'
     assert core.get_iep(sid)==record
@@ -225,7 +227,7 @@ def test_catalog_option_joins_the_same_draft_queue(workspace,record,original_pdf
     next(b for b in app.button if b.label=='Discard option').click().run()
     assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Keep this edited break plan.'
     assert core.get_iep(sid)==record
-    click(app,'Send change to review')
+    click(app,'Add to draft')
     review=reviews.list_reviews(sid)[0]
     assert review['status']=='pending'
     assert review['candidate']['services']['supplementary_aids']['rows'][-1]['location']=='Communication course'
@@ -270,7 +272,7 @@ def test_batch_draft_submits_once_and_removes_queue(workspace,record,original_pd
     click(app,'Suggested modifications')
     click(app,'Draft modifications');click(app,'Draft modifications')
     assert len(app.session_state['suggestions_'+sid])==2
-    click(app,'Send all changes to review')
+    click(app,'Add all to draft')
     assert len(reviews.list_reviews(sid))==1
     assert app.session_state['active_tool_'+sid]=='Modifications'
     assert all('_submitted_at' in item for item in app.session_state['suggestions_'+sid])
@@ -310,9 +312,9 @@ def test_single_send_keeps_other_edits_and_tool(workspace,record,original_pdf,mo
     click(app,'Suggested modifications')
     click(app,'Draft modifications')
     [t for t in app.text_area if t.label=='Proposed wording'][1].set_value('Keep this unsent wording.').run()
-    click(app,'Send change to review')
+    click(app,'Add to draft')
     assert app.session_state['active_tool_'+sid]=='Modifications'
-    assert any(s.value=='Submitted for review' for s in app.success)
+    assert any(s.value=='Added to draft' for s in app.success)
     assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Keep this unsent wording.'
     app.session_state['suggestions_'+sid][0]['_submitted_at']-=10
     app.run()
@@ -321,6 +323,43 @@ def test_single_send_keeps_other_edits_and_tool(workspace,record,original_pdf,mo
     assert len(app.session_state['suggestions_'+sid])==1
     assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Keep this unsent wording.'
     assert len(reviews.list_reviews(sid))==1 and core.get_iep(sid)==record
+
+
+def test_edit_and_form_use_the_same_suggestion_draft(workspace,record,original_pdf,monkeypatch):
+    monkeypatch.setattr(core,'list_supporting_docs',lambda sid:['Progress observation.txt'])
+    sid,app=ready(record,original_pdf)
+    monkeypatch.setattr(core,'suggest_updates',lambda student,note='',**kw:[
+        core._make_change(record,'goals.0.goal','Use a written next step in four of five sessions.','Course evidence',''),
+        core._make_change(record,'profile.needs','Check implementation across courses.','Course evidence','')])
+    click(app,'Suggested modifications');click(app,'Draft modifications');click(app,'Add to draft')
+    rid=reviews.list_reviews(sid,open_only=True)[0]['id']
+    click(app,'Edit draft');select(app,'Section','Annual goals');select(app,'Field','goals.0.goal')
+    assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Use a written next step in four of five sessions.'
+    next(t for t in app.text_area if t.label=='Proposed wording').set_value('Use a written next step in five of six sessions.').run()
+    click(app,'Save to draft')
+    assert app.session_state['active_tool_'+sid]=='Edit'
+    click(app,'Suggested modifications');click(app,'Add to draft')
+    assert reviews.get(rid)['candidate']['profile']['needs']=='Check implementation across courses.'
+    click(app,'Edit draft')
+    next(s for s in app.segmented_control if s.label=='View').set_value('Form').run()
+    select(app,'Form section','Annual goals')
+    assert next(t for t in app.text_area if t.label=='Measurable annual goal').value=='Use a written next step in five of six sessions.'
+    select(app,'Form section','Special factors')
+    next(t for t in app.text_input if t.label=='Progress reports every ___ weeks').set_value('4')
+    click(app,'Save special factors to draft')
+    pending=reviews.get(rid)
+    assert pending['candidate']['progress_report_weeks']=='4'
+    assert pending['candidate']['profile']['needs']=='Check implementation across courses.'
+    assert core.get_iep(sid)==record and len(reviews.list_reviews(sid,open_only=True))==1
+    click(app,'Review draft')
+    assert not any(s.label=='Draft history' for s in app.selectbox)
+    assert len(next(s for s in app.selectbox if s.label=='Changed field').options)==3
+    click(app,'Continue to decision')
+    next(c for c in app.checkbox if c.label.startswith('I checked the source')).check().run()
+    click(app,'Approve draft')
+    assert core.get_iep(sid)==pending['candidate'] and len(core.list_versions(sid))==1
+    assert not reviews.list_reviews(sid,open_only=True)
+    assert 'suggestions_'+sid not in app.session_state
 
 
 def test_report_dialog_defaults_follow_role_and_course(platform,record,original_pdf):

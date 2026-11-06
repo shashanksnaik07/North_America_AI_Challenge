@@ -26,7 +26,7 @@ def submitted_option(sid, draft_id):
         st.session_state[queue]=[item for item in st.session_state[queue] if item.get('_draft_id')!=draft_id]
         return
     with st.container(border=True):
-        st.success('Submitted for review',icon=':material/check_circle:')
+        st.success('Added to draft',icon=':material/check_circle:')
         st.caption(item['section'])
 
 
@@ -73,10 +73,9 @@ def rows_editor(rows: list[dict], columns: list[str], key: str) -> list[dict]:
     return clean
 
 
-def save_form(new_iep: dict, section: str, sid: str, teacher: str) -> None:
-    if run_safely(reviews.stage_change, sid, new_iep, f"Form edit: {section}", teacher):
-        flash(f"Saved for review: {section}")
-        st.session_state['pending_tool_'+sid]='Review'
+def save_form(new_iep: dict, section: str, sid: str, teacher: str, draft_revision=0) -> None:
+    if run_safely(reviews.stage_change, sid, new_iep, f"Form edit: {section}", teacher,expected_draft_revision=draft_revision):
+        flash(f"Saved to the working draft: {section}")
         st.rerun()
 
 
@@ -89,14 +88,14 @@ def save_form(new_iep: dict, section: str, sid: str, teacher: str) -> None:
 def modifications(sid, teacher=''):
     """Evidence-first drafting, optional discussion, and one human-review queue."""
     import integrations as I
-    import workspace_design as D
     queue='suggestions_'+sid
     st.session_state.setdefault(queue,[])
     st.caption('Review suggested changes based on the current IEP, course feedback and team reports.')
-    pending=reviews.list_reviews(sid,open_only=True)
+    pending=reviews.working_draft(sid)
+    if pending and (pending['kind']=='import' or pending.get('merge_conflicts')):
+        st.info('Open Review draft to complete the pending import or resolve conflicting changes before adding suggestions.');return
     if pending:
-        st.info(f"{len(pending)} saved {'draft is' if len(pending)==1 else 'drafts are'} ready to compare.")
-        if st.button('Review saved drafts',width='stretch',icon=':material/edit_note:'): D.navigate(sid,'Review')
+        st.info('A working draft is open. Selected suggestions join that draft; review and approve all its changes together.')
     evidence=I.evidence(sid)
     files=core.list_supporting_docs(sid)
     st.caption(f'{len(evidence)} reports & assignment results · {len(files)} supporting files')
@@ -170,7 +169,7 @@ def modifications(sid, teacher=''):
                     row[field]=st.text_input(label,row.get(field,''),key=f'modification_{field}_{sid}_{draft_id}',persist_state='session')
             if suggestion['action']=='add_goal':
                 suggestion['payload']['area']=st.text_input('Goal area',suggestion['payload'].get('area',''),key=f'modification_area_{sid}_{draft_id}',persist_state='session')
-            if st.button('Send change to review',key=f'modification_submit_{sid}_{draft_id}',type='primary',disabled=not wording.strip(),width='stretch',icon=':material/rate_review:'):
+            if st.button('Add to draft',key=f'modification_submit_{sid}_{draft_id}',type='primary',disabled=not wording.strip(),width='stretch',icon=':material/add:'):
                 result=run_safely(core.apply_suggestion,sid,{**suggestion,'suggested_text':wording},teacher)
                 if result:
                     mark_submitted([suggestion])
@@ -178,8 +177,8 @@ def modifications(sid, teacher=''):
                 st.session_state[queue].pop(i);st.rerun()
     active=[item for item in st.session_state[queue] if '_submitted_at' not in item]
     if len(active)>1:
-        st.caption('Send related changes together so the team can review and approve one complete draft.')
-        if st.button('Send all changes to review',icon=':material/playlist_add_check:',type='primary',width='stretch'):
+        st.caption('Add selected suggestions to the same working draft as your direct edits.')
+        if st.button('Add all to draft',icon=':material/playlist_add_check:',type='primary',width='stretch'):
             result=run_safely(drafting.submit,sid,active,teacher)
             if result:
                 mark_submitted(active)
@@ -187,24 +186,30 @@ def modifications(sid, teacher=''):
 
 def form(student_id, teacher=""):
     sid = student_id
-    iep = core.get_iep(sid)
+    working=reviews.working_draft(sid)
+    if working and working['kind']=='import':
+        st.info('Review the pending import before editing this IEP.');return
+    if working and working.get('merge_conflicts'):
+        st.info('Open Review draft to resolve the conflicting changes before editing.');return
+    iep = copy.deepcopy(working['candidate'] if working else core.get_iep(sid))
     name = iep['student_name']
     first = name.split()[0] if name else 'Student'
     vcount = len(core.list_versions(sid))
     sug_key = f'suggestions_{sid}'
     st.session_state.setdefault(sug_key, [])
-    save_form = partial(globals()['save_form'], sid=sid, teacher=teacher)
+    revision=working['revision'] if working else 0
+    save_form = partial(globals()['save_form'], sid=sid, teacher=teacher,draft_revision=revision)
     section=st.selectbox('Form section',['Student information & present levels','Special factors','Transition','Annual goals','Services & accommodations','Placement & team','Additional fields'],key='form_section_'+sid,persist_state='session')
     if section=='Additional fields' and iep.get('extensions'):
         with st.expander('Template-specific information'):
-            with st.form('template_extensions_'+sid):
+            with st.form(f'template_extensions_{sid}_{revision}'):
                 proposed=copy.deepcopy(iep)
                 for field,value in iep['extensions'].items():
-                    proposed['extensions'][field]=U.typed_value(field.replace('_',' ').title(),value,'ext_form_'+sid+field)
-                if st.form_submit_button('Submit template fields for review',icon=':material/crop_free:'): save_form(proposed,'Template-specific information')
+                    proposed['extensions'][field]=U.typed_value(field.replace('_',' ').title(),value,f'ext_form_{sid}_{revision}_{field}')
+                if st.form_submit_button('Save template fields to draft',icon=':material/crop_free:'): save_form(proposed,'Template-specific information')
     elif section=='Additional fields': st.info('This plan has no template-specific fields yet.')
-    st.caption("Complete one section at a time and save it for review before switching sections. The plan changes only after approval.")
-    k = f"{sid}_{vcount}"
+    st.caption("Editing the working draft. Save each section here; Review draft approves the combined changes as the next IEP version.")
+    k = f"{sid}_{vcount}_{revision}"
 
     if section=='Student information & present levels':
         with st.form(f"f1_{k}"):
@@ -223,7 +228,7 @@ def form(student_id, teacher=""):
             n["meta"]["case_manager"] = c3.text_input("Case manager (not printed)", iep["meta"]["case_manager"])
             for fk, label in S.PROFILE_FIELDS:
                 n["profile"][fk] = st.text_area(label, iep["profile"][fk])
-            if st.form_submit_button("Review student details",icon=':material/person:'):
+            if st.form_submit_button("Save student details to draft",icon=':material/person:'):
                 save_form(n, "Student information and profile")
 
     if section=='Special factors':
@@ -246,7 +251,7 @@ def form(student_id, teacher=""):
                 index=S.NONACADEMIC_OPTIONS.index(na["participation"]) if na["participation"] in S.NONACADEMIC_OPTIONS else 0)
             n["nonacademic"]["description"] = st.text_input("Describe supports / explanation", na["description"])
             n["progress_report_weeks"] = st.text_input("Progress reports every ___ weeks", iep["progress_report_weeks"])
-            if st.form_submit_button("Review special factors",icon=':material/rate_review:'):
+            if st.form_submit_button("Save special factors to draft",icon=':material/rate_review:'):
                 save_form(n, "Special factors and transportation")
 
     if section=='Transition':
@@ -279,7 +284,7 @@ def form(student_id, teacher=""):
                 acts = st.text_area("Transition activities (one per line)", "\n".join(g["activities"]), key=f"ta_{ak}_{k}")
                 n["transition_goals"][ak]["activities"] = [x.strip() for x in acts.splitlines() if x.strip()]
                 n["transition_goals"][ak]["people"] = st.text_input("Person(s)/agency involved", g["people"], key=f"tp_{ak}_{k}")
-            if st.form_submit_button("Review transition changes",icon=':material/rate_review:'):
+            if st.form_submit_button("Save transition changes to draft",icon=':material/rate_review:'):
                 save_form(n, "Transition")
 
     if section=='Annual goals':
@@ -305,7 +310,7 @@ def form(student_id, teacher=""):
                     keep.append(ng)
                 st.divider()
             add = st.checkbox("Add a new empty goal")
-            if st.form_submit_button("Review goal changes",icon=':material/rate_review:'):
+            if st.form_submit_button("Save goal changes to draft",icon=':material/rate_review:'):
                 n["goals"] = keep + ([S.empty_goal() | {"mastery_date": iep["iep_to"]}] if add else [])
                 save_form(n, "Annual goals")
 
@@ -318,7 +323,7 @@ def form(student_id, teacher=""):
                 if ck != "special_education":
                     n["services"][ck]["needed"] = st.checkbox("Needed", iep["services"][ck]["needed"], key=f"sn_{ck}_{k}")
                 n["services"][ck]["rows"] = rows_editor(iep["services"][ck]["rows"], cols, f"sr_{ck}_{k}")
-            if st.form_submit_button("Review service changes",icon=':material/rate_review:'):
+            if st.form_submit_button("Save service changes to draft",icon=':material/rate_review:'):
                 save_form(n, "Services")
 
     if section=='Placement & team':
@@ -343,7 +348,7 @@ def form(student_id, teacher=""):
             n["participants"] = rows_editor(iep["participants"], ["position", "name", "date"], f"pp_{k}")
             st.markdown("**Information from people not in attendance**")
             n["not_in_attendance"] = rows_editor(iep["not_in_attendance"], ["position", "name", "date"], f"pn_{k}")
-            if st.form_submit_button("Review placement & team changes",icon=':material/rate_review:'):
+            if st.form_submit_button("Save placement & team changes to draft",icon=':material/rate_review:'):
                 save_form(n, "Rights, ESY, LRE and team")
 
 

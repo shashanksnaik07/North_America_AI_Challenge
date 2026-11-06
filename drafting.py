@@ -74,5 +74,5 @@ def submit(sid, items, actor=''):
         if item.get('teacher_note'): evidence.append({'source':'teacher note','text':item['teacher_note'], 'omitted_evidence_ids':item.get('omitted_evidence_ids',[])})
     evidence=list({json.dumps(value,sort_keys=True):value for value in evidence}.values())
     title=items[0]['section'] if len(used)==1 else f'Modifications: {len(used)} related changes'
-    rid=R.stage_change(sid,candidate,title,actor,evidence=evidence,expected_base_hash=R.fingerprint(base))
-    return f'Submitted to Review: {title} (review {rid[:8]}).'
+    R.stage_change(sid,candidate,title,actor,evidence=evidence,expected_base_hash=R.fingerprint(base))
+    return 'Added to the working IEP draft. Review the combined changes before approval.'

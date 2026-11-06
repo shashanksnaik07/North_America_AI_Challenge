@@ -139,7 +139,7 @@ def student_overview(sid,record):
             if st.button('Open current IEP',type='primary',width='stretch',icon=':material/arrow_forward:'): navigate(sid,'Read')
             pending=R.list_reviews(sid,open_only=True)
             st.caption(f"{len(pending)} {'draft' if len(pending)==1 else 'drafts'} awaiting review")
-            if pending and st.button('Review drafts',width='stretch',icon=':material/edit_note:'): navigate(sid,'Review')
+            if pending and st.button('Review draft',width='stretch',icon=':material/edit_note:'): navigate(sid,'Review')
 
 def student_documents(sid,actor):
     st.subheader('Student documents')
@@ -152,10 +152,11 @@ def student_documents(sid,actor):
     if section=='IEP history': tools.history(sid,actor)
     else: resources_workspace(sid,actor,'Supporting files')
 
-def submit(sid,candidate,title,actor,document=None):
-    rid=U.attempt(R.stage_change,sid,candidate,title,actor,document=document)
+def submit(sid,candidate,title,actor,document=None,draft_revision=None):
+    rid=U.attempt(R.stage_change,sid,candidate,title,actor,document=document,expected_draft_revision=draft_revision)
     if rid:
-        st.session_state['flash']='Change saved as a draft. Review it before updating the IEP.'
+        st.session_state['flash']='Saved to the working draft. Review all its changes before updating the IEP.'
+        if draft_revision is not None: st.rerun()
         navigate(sid,'Review',rid)
 
 def fact(title,value):
@@ -183,9 +184,12 @@ def overview(sid, record):
             st.link_button('Hong Kong example',metadata['edb']['url'],icon=':material/open_in_new:')
             st.download_button('Download provenance',json.dumps(metadata,indent=2),sid+'-provenance.json','application/json',icon=':material/download:')
 
-def edit_panel(sid,record,actor):
-    st.subheader('Propose an edit')
-    st.caption('Select a section below or click a field on the PDF. Changes need review before they update the plan.')
+def edit_panel(sid,record,actor,working=None):
+    st.subheader('Edit working draft')
+    st.caption('Your edits and selected suggestions share this draft. Review approves all changes as the next current IEP.')
+    if working and working.get('merge_conflicts'):
+        st.info('Open Review draft to resolve the conflicting changes before editing.');return
+    revision=working['revision'] if working else 0
     fields={p:v for p,v in O.leaf_fields(record).items() if not isinstance(v,(dict,list))}
     sections=[s for s in SECTION_PREFIXES if any(section_for(p)==s for p in fields)]
     selected_section=st.selectbox('Section',sections,key='edit_section_'+sid,persist_state='session')
@@ -197,9 +201,9 @@ def edit_panel(sid,record,actor):
     value=U.typed_value('Proposed wording',fields[field],draft_key)
     changed=value!=fields[field]
     if changed: st.caption('Unsaved draft · stays here while you switch tools.')
-    if st.button('Save for review',type='primary',disabled=not changed,width='stretch',icon=':material/save:'):
+    if st.button('Save to draft',type='primary',disabled=not changed,width='stretch',icon=':material/save:'):
         candidate=copy.deepcopy(record);S.set_path(candidate,field,value)
-        submit(sid,candidate,'Edit: '+label(field),actor)
+        submit(sid,candidate,'Edit: '+label(field),actor,draft_revision=revision)
     with st.expander('Add a goal, service or team member'):
         st.caption('Use the form editor to add or remove rows.')
         if st.button('Open form editor',width='stretch',icon=':material/edit_note:'):
@@ -208,12 +212,12 @@ def edit_panel(sid,record,actor):
         st.caption('Only needed when a field is missing or appears in the wrong place.')
         mapping=st.checkbox('Select an area on the PDF',key='mapping_'+sid)
         selected=st.session_state.get('selected_region_'+sid)
-        document=P.ensure_document(sid,record)
+        document=working['document'] if working else P.ensure_document(sid,record)
         if selected:
             st.caption(f"Selected area on page {selected['page']+1}.")
             if st.button('Use this area for the field',icon=':material/crop_free:'):
                 mapped=U.attempt(P.set_binding,document,field,{'page':selected['page'],'rect':P.view_rectangle(document,selected['page'],selected['rect'],inverse=True)})
-                if mapped: submit(sid,record,'Position field: '+label(field),actor,mapped)
+                if mapped: submit(sid,record,'Position field: '+label(field),actor,mapped,draft_revision=revision)
         with st.expander('Enter exact coordinates'):
             pages=P.inspect_pdf(P.source_bytes(document))
             page=st.number_input('Page for field',1,len(pages),1,key='bind_page_'+sid)-1
@@ -221,21 +225,21 @@ def edit_panel(sid,record,actor):
             coords=[st.number_input(n,value=float(old[i]),key=f'coord_{sid}_{field}_{page}_{i}') for i,n in enumerate(['Left','Top','Right','Bottom'])]
             if st.button('Save field location for review',icon=':material/crop_free:'):
                 mapped=U.attempt(P.set_binding,document,field,{'page':page,'rect':coords})
-                if mapped: submit(sid,record,'Position field: '+label(field),actor,mapped)
+                if mapped: submit(sid,record,'Position field: '+label(field),actor,mapped,draft_revision=revision)
         with st.expander('Replace the source PDF'):
             upload=st.file_uploader('Source PDF',type=['pdf'],key='attach_'+sid)
             if st.button('Review replacement PDF',disabled=upload is None,icon=':material/description:'):
                 mapped=U.attempt(P.archive_source,upload.getvalue(),record,upload.name)
-                if mapped: submit(sid,record,'Replace source PDF',actor,mapped)
+                if mapped: submit(sid,record,'Replace source PDF',actor,mapped,draft_revision=revision)
         with st.expander('Edit structured data'):
             st.caption('For template administrators. Ordinary edits belong in the fields above.')
-            raw=st.text_area('IEP JSON',json.dumps(record,indent=2),height=200,key='advanced_'+sid)
+            raw=st.text_area('IEP JSON',json.dumps(record,indent=2),height=200,key=f'advanced_{sid}_{revision}')
             if st.button('Validate and review data',icon=':material/rate_review:'):
                 try:
                     import jsonschema
                     candidate=json.loads(raw)
                     jsonschema.validate(candidate,O.template_schema(document.get('template_id','custom')))
-                    submit(sid,candidate,'Structured data edit',actor)
+                    submit(sid,candidate,'Structured data edit',actor,draft_revision=revision)
                 except (ValueError,jsonschema.ValidationError) as exc: st.error(str(exc))
     return field
 
@@ -257,7 +261,8 @@ def evidence_cards(items):
 
 def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imports=False,imports_only=False,review_id=None):
     generation=st.session_state.get('workspace_generation')
-    st.subheader('Review changes')
+    if sid: R.working_draft(sid)
+    st.subheader('Review draft')
     include_closed=st.checkbox('Show completed reviews',key=f'closed_{sid}')
     items=R.list_reviews(None if include_imports else sid,open_only=not include_closed)
     if include_imports: items=[r for r in items if r.get('student_id') in (None,sid)]
@@ -271,12 +276,28 @@ def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imp
     preferred=st.session_state.pop('selected_review',None)
     if preferred in ids: st.session_state[key]=preferred
     if st.session_state.get(key) not in ids: st.session_state[key]=ids[0]
-    rid=st.selectbox('Change to review',ids,key=key,format_func=lambda x:next(r['title'] for r in items if r['id']==x))
+    rid=st.selectbox('Draft history',ids,key=key,format_func=lambda x:next(r['title']+' · '+r['status'] for r in items if r['id']==x)) if include_closed or len(items)>1 else ids[0]
     item=R.get(rid); scope=rid+str(item['revision'])
-    status={'pending':'Awaiting review','escalated':'Specialist review needed','approved':'Approved','rejected':'Rejected'}[item['status']]
+    status={'pending':'Awaiting review','escalated':'Specialist review needed','approved':'Approved','rejected':'Rejected','superseded':'Combined into working draft'}[item['status']]
     st.markdown('<span class="status-pill">'+status+'</span>',unsafe_allow_html=True)
     delta=P.changes(item['base'],item['candidate'])
     if item['assignee']: st.caption('Assigned to '+item['assignee']+' · '+item['required_role'])
+    if item.get('merge_conflicts'):
+        st.warning('Earlier drafts contain conflicting changes. Resolve each choice before approval.')
+        for conflict in item['merge_conflicts']:
+            with st.container(border=True):
+                path=conflict['path'];st.markdown('**'+('PDF layout' if path=='@document' else label(path))+'**')
+                st.caption('Alternative from: '+conflict['source'])
+                if path=='@document':
+                    for title,doc in [('Working PDF',item['document']),('Alternative PDF',conflict['proposed'])]:
+                        st.download_button(title,P.source_bytes(doc),title+'.pdf','application/pdf',key=conflict['id']+title)
+                else:
+                    current=S.get_path(item['candidate'],path)
+                    st.markdown(R.diff_html(current,conflict['proposed']),unsafe_allow_html=True)
+                choice=st.radio('Which version should stay in the draft?',['Keep working draft','Use alternative'],key=scope+conflict['id'])
+                if st.button('Resolve change',key=scope+conflict['id']+'_resolve',icon=':material/check:'):
+                    try: R.resolve_conflict(rid,conflict['id'],choice=='Use alternative',actor,item['revision']);U.notice('Conflict resolved. Review the updated draft.')
+                    except Exception as exc: st.error(str(exc))
     step=st.segmented_control('Review step',['Compare','Decide'],default='Compare',required=True,key='review_step_'+scope)
     if step=='Compare':
         st.caption(f"{len(delta)} {'field changed' if len(delta)==1 else 'fields changed'}. Removed text is struck through in red; added text is green.")
@@ -297,7 +318,7 @@ def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imp
             with st.expander('Information behind this change'): evidence_cards(item['evidence'])
         if item.get('source_text'):
             with st.expander('Read extracted source text'): st.text(item['source_text'])
-        if item['status'] in R.OPEN:
+        if item['status'] in R.OPEN and not item.get('merge_conflicts'):
             with st.expander('Correct this draft'):
                 fields=U.field_choices(item['candidate'])
                 field=st.selectbox('Field to correct',list(fields),format_func=label,key=scope+'_field')
@@ -335,10 +356,11 @@ def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imp
             if not reviewer.strip(): st.caption('Enter your name to record a decision.')
             elif not can_decide: st.caption('This decision needs the assigned reviewer and required role, or an Administrator.')
             elif not confirmed: st.caption('Confirm your review to enable approval.')
-            if st.button('Approve import' if item['kind']=='import' else 'Approve changes',type='primary',disabled=not confirmed or not reviewer.strip() or not can_decide,width='stretch',key=scope+'_approve',icon=':material/check_circle:'):
+            if st.button('Approve import' if item['kind']=='import' else 'Approve draft',type='primary',disabled=not confirmed or not reviewer.strip() or not can_decide or bool(item.get('merge_conflicts')),width='stretch',key=scope+'_approve',icon=':material/check_circle:'):
                 try:
                     student=R.decide(rid,'approved',reviewer,reviewer_role,confirmed,note,item['revision'],expected_generation=generation)
                     if student:
+                        st.session_state.pop('suggestions_'+student,None)
                         st.session_state['pending_student']=student
                         st.session_state['pending_student_section']='IEP'
                     st.session_state.pop('active_import',None)
@@ -370,11 +392,10 @@ def acrobat_workspace(sid,record,actor,role):
         st.session_state['editor_field_'+sid]=field
         st.session_state['edit_section_'+sid]=section_for(field)
     if 'pending_view_'+sid in st.session_state: st.session_state['document_view_'+sid]=st.session_state.pop('pending_view_'+sid)
-    count=len(R.list_reviews(sid,open_only=True))
+    working=R.working_draft(sid)
     with st.container(horizontal=True,vertical_alignment='center',key='workspace-tasks'):
         for task,icon in [('Read','description'),('Edit','edit'),('Modifications','auto_fix_high'),('Review','fact_check')]:
-            title={'Read':'View IEP','Edit':'Edit draft','Modifications':'Suggested modifications','Review':'Review drafts'}[task]
-            if task=='Review' and count: title+=f' ({count})'
+            title={'Read':'View IEP','Edit':'Edit draft','Modifications':'Suggested modifications','Review':'Review draft'}[task]
             if st.button(title,icon=f':material/{icon}:',type='primary' if tool==task else 'secondary',key='task_'+sid+task): navigate(sid,task)
     with st.container(key='document-layout-read' if tool=='Read' else 'document-layout'):
         canvas,pane=st.columns([2.1,1],gap='medium')
@@ -382,14 +403,16 @@ def acrobat_workspace(sid,record,actor,role):
         with pane:
             with st.container(key='inspector'):
                 if tool=='Read': overview(sid,record)
-                elif tool=='Edit': field=edit_panel(sid,record,actor)
+                elif tool=='Edit':
+                    if working and working['kind']=='import': st.info('Review the pending import before editing this IEP.')
+                    else: field=edit_panel(sid,working['candidate'] if working else record,actor,working)
                 elif tool=='Review': item=review_inbox(actor,role,sid,compact=True)
                 else:
                     st.subheader('Suggested modifications' if tool=='Modifications' else 'Plan history')
                     if tool=='Modifications': tools.modifications(sid,actor)
                     else: tools.history(sid,actor)
         with canvas:
-            document=(item or {}).get('document') or P.ensure_document(sid,record)
+            document=(item or {}).get('document') or ((working or {}).get('document') if tool=='Edit' else None) or P.ensure_document(sid,record)
             if tool=='Review' and item and not item.get('document'):
                 st.info('This source has no readable PDF. Compare the extracted information in Review.')
                 st.text(item.get('source_text') or 'No text could be extracted. Review the source file before approving.')
@@ -403,14 +426,17 @@ def acrobat_workspace(sid,record,actor,role):
                 if view=='PDF':
                     zoom=st.selectbox('Zoom',[100,125,150,200],format_func=lambda x:'Fit width' if x==100 else f'{x}%',key='zoom_'+sid,width=125,persist_state='session')
                 with st.popover('Download',icon=':material/download:'):
-                    try: st.download_button('Proposed IEP' if item else 'Current IEP',P.render_document(document,item['candidate'] if item else record)[0],'iep-proposed.pdf' if item else 'iep.pdf','application/pdf',width='stretch',icon=':material/download:')
+                    proposed=item or (working if tool=='Edit' else None)
+                    try: st.download_button('Draft IEP' if proposed else 'Current IEP',P.render_document(document,proposed['candidate'] if proposed else record)[0],'iep-draft.pdf' if proposed else 'iep.pdf','application/pdf',width='stretch',icon=':material/download:')
                     except ValueError as exc: st.error(str(exc))
                     st.download_button('Unchanged original',P.source_bytes(document.get('original_source',document)),document['filename'],'application/pdf',width='stretch',icon=':material/download:')
             if view=='Form':
-                if tool=='Review' and item:
-                    st.subheader('Proposed changes')
-                    for d in P.changes(item['base'],item['candidate']):
-                        st.markdown('**'+label(d['path'])+'**');st.markdown(R.diff_html(d['before'],d['after']),unsafe_allow_html=True)
+                if tool=='Review':
+                    if item:
+                        st.subheader('Proposed changes')
+                        for d in P.changes(item['base'],item['candidate']):
+                            st.markdown('**'+label(d['path'])+'**');st.markdown(R.diff_html(d['before'],d['after']),unsafe_allow_html=True)
+                    else: st.info('No pending draft. Open View IEP to see the current plan.')
                 else: tools.form(sid,actor)
                 return
             highlighted_fields=[];color='green';redlines=[]
@@ -430,7 +456,7 @@ def acrobat_workspace(sid,record,actor,role):
                 missing=sum(not P.binding_key(document,d['path']) for d in delta)
                 if missing: st.warning(f'{missing} changed fields need a PDF location. Check them in Form view; downloads include them on added pages.')
             else:
-                preview_record=record
+                preview_record=working['candidate'] if tool=='Edit' and working else record
             if document['origin']=='generated baseline': st.caption('Preview created from the saved IEP. Imported PDFs keep their original layout.')
             V.continuation_notice(document)
             show_fields=tool=='Edit'
