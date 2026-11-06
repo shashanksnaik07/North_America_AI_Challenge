@@ -63,7 +63,7 @@ def test_onboarding_and_templates_without_students(workspace):
 
 def test_tools_and_form_sections_remain_available(workspace,record,original_pdf):
     sid,app=ready(record,original_pdf)
-    for tool in ['Ask','Suggest updates','Accommodations','History','Summary','Edit','Read']:
+    for tool in ['Suggested modifications','Edit','Read']:
         click(app,tool)
         assert [t.label for t in app.tabs]==['My caseload','Student workspace']
         assert any(s.label=='Zoom' for s in app.selectbox)
@@ -78,7 +78,7 @@ def test_draft_persists_across_tools_and_is_student_specific(workspace,record,or
     click(app,'Edit')
     select(app,'Field','student_name')
     next(t for t in app.text_area if t.label=='Proposed wording').set_value('Unsaved draft name').run()
-    click(app,'Ask'); click(app,'Edit')
+    click(app,'Suggested modifications'); click(app,'Edit')
     assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Unsaved draft name'
     other=core.create_student(core.blank_iep('Other Student'))
     app.run()
@@ -101,8 +101,8 @@ def test_report_to_suggestion_navigation(platform,record,original_pdf):
     app.session_state['student_section']='Progress & reports';app.run()
     click(app,'Use these reports to draft an update')
     assert app.session_state['main_navigation']=='Student workspace'
-    assert app.session_state['active_tool_'+sid]=='Suggest updates'
-    assert any(b.label=='Draft suggestions' for b in app.button)
+    assert app.session_state['active_tool_'+sid]=='Modifications'
+    assert any(b.label=='Draft modifications' for b in app.button)
 
 
 def test_caseload_search_and_student_overview(workspace,record,original_pdf):
@@ -157,3 +157,87 @@ def test_connections_from_caseload_identify_the_target_student(workspace,record)
     assert any(b.label=='Refresh roster' for b in app.button)
     click(app,'Back to student workspace')
     assert next(s for s in app.selectbox if s.label=='Student').value==sid
+
+
+def test_single_modification_workflow_discussion_to_review(workspace,record,original_pdf,monkeypatch):
+    sid,app=ready(record,original_pdf)
+    monkeypatch.setattr(core,'answer',lambda student,question:('Consider course-specific evidence before changing the plan.',[]))
+    monkeypatch.setattr(core,'suggest_updates',lambda student,note:[{
+        'action':'change','field':'profile.needs','section':'Learning and support needs','source':'test observation',
+        'current_text':record['profile']['needs'],'suggested_text':'Proposed classroom support wording.',
+        'reason':'Compare observations across courses.','teacher_note':note,'evidence':[]}])
+    click(app,'Suggested modifications')
+    assert not any(b.label in ['Ask','Suggest updates','Accommodations','Generate summary','Summary'] for b in app.button)
+    next(t for t in app.text_area if t.label=='Question or observation').set_value('How should task chunking change?').run()
+    click(app,'Discuss options')
+    assert app.session_state['modification_discussion_'+sid]
+    click(app,'Draft modifications')
+    assert core.get_iep(sid)==record
+    next(t for t in app.text_area if t.label=='Proposed wording').set_value('Edited support wording retained for review.').run()
+    click(app,'View IEP');click(app,'Suggested modifications')
+    assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Edited support wording retained for review.'
+    click(app,'Send change to review')
+    assert len(reviews.list_reviews(sid,open_only=True))==1
+    assert reviews.list_reviews(sid)[0]['candidate']['profile']['needs']=='Edited support wording retained for review.'
+    assert core.get_iep(sid)==record
+
+
+def test_mock_caseload_filters_and_pagination(workspace,record):
+    import copy
+    for index in range(24):
+        r=copy.deepcopy(record);r['student_name']=f'Demo filter {index:02d}'
+        r['extensions']={'mock_cohort':'test','mock_profile_type':'Profile A' if index<12 else 'Profile B',
+                         'mock_template_state':'Alabama' if index%2==0 else 'Montana',
+                         'mock_template_id':'alabama-state-iep-template' if index%2==0 else 'montana-office-of-public-instruction-iep-blank'}
+        core.create_student(r)
+    app=AppTest.from_file(str(APP),default_timeout=60).run()
+    assert len([b for b in app.button if b.label=='Open IEP'])==20
+    select(app,'Mock profile','Profile B');select(app,'Template state','Montana')
+    assert len([b for b in app.button if b.label=='Open IEP'])==6
+    assert not any(b.label=='Demo filter 00' for b in app.button)
+
+
+def test_catalog_option_joins_the_same_draft_queue(workspace,record,original_pdf,monkeypatch):
+    sid,app=ready(record,original_pdf)
+    option={'id':'time_001','name':'Planned breaks','category':'timing','description':'Agree on a short break and return cue.',
+            'matched_on':['task'],'assessment_use':False,'instructional_use':True,'evidence_level':'unverified'}
+    monkeypatch.setattr(core,'recommend_accommodations',lambda *args,**kwargs:[option])
+    click(app,'Suggested modifications');click(app,'Find relevant options')
+    assert next(b for b in app.button if b.label=='Add option to draft').disabled
+    for label,value in [('When / how often','During long independent tasks'),('Amount or duration','Three minutes'),('Course or setting','Communication course')]:
+        next(t for t in app.text_input if t.label==label).set_value(value).run()
+    click(app,'Add option to draft')
+    suggestion=app.session_state['suggestions_'+sid][0]
+    assert suggestion['payload']['frequency']=='During long independent tasks'
+    assert suggestion['payload']['amount']=='Three minutes'
+    click(app,'Add option to draft')
+    [t for t in app.text_area if t.label=='Proposed wording'][1].set_value('Keep this edited break plan.').run()
+    next(b for b in app.button if b.label=='Discard option').click().run()
+    assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Keep this edited break plan.'
+    assert core.get_iep(sid)==record
+    click(app,'Send change to review')
+    review=reviews.list_reviews(sid)[0]
+    assert review['status']=='pending'
+    assert review['candidate']['services']['supplementary_aids']['rows'][-1]['location']=='Communication course'
+    assert review['candidate']['services']['supplementary_aids']['rows'][-1]['service']=='Keep this edited break plan.'
+    assert any(e.get('catalog_id')=='time_001' for e in review['evidence'])
+
+
+def test_grades_show_assignment_instructor_course_and_filter(platform,record,original_pdf):
+    import integrations as I
+    sid,app=ready(record,original_pdf)
+    I.sync_sis('powerschool',platform.base)
+    I.link_student(sid,'powerschool','powerschool:stu-001')
+    for course in ['math-9','english-9']:I.sync_lms(sid,'powerschool:'+course,platform.base)
+    next(s for s in app.segmented_control if s.label=='Student record').set_value('Progress & reports').run()
+    assert not app.exception,app.exception
+    grades=next(d.value for d in app.dataframe if 'Assignment' in d.value.columns)
+    assert set(grades['Course'])=={'Algebra I','English 9'}
+    assert set(grades['Grade'])=={'78 / 100','86 / 100'}
+    assert set(grades['Date'])=={'Not supplied'}
+    assert not grades['Instructor'].str.contains('Author not provided').any()
+    select(app,'Filter by course','Algebra I')
+    grades=next(d.value for d in app.dataframe if 'Assignment' in d.value.columns)
+    assert len(grades)==1 and grades.iloc[0]['Course']=='Algebra I'
+    click(app,'Use these reports to draft an update')
+    assert app.session_state['active_tool_'+sid]=='Modifications'

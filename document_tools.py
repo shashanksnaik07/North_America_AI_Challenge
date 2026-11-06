@@ -2,6 +2,7 @@
 import copy
 import json
 from functools import partial
+from uuid import uuid4
 import pandas as pd
 import streamlit as st
 import core
@@ -56,115 +57,86 @@ def save_form(new_iep: dict, section: str, sid: str, teacher: str) -> None:
         st.rerun()
 
 
-def ask(student_id, teacher=""):
-    sid = student_id
-    iep = core.get_iep(sid)
-    name = iep['student_name']
-    first = name.split()[0] if name else 'Student'
-    vcount = len(core.list_versions(sid))
-    sug_key = f'suggestions_{sid}'
-    st.session_state.setdefault(sug_key, [])
-    save_form = partial(globals()['save_form'], sid=sid, teacher=teacher)
-    hist_key = f"chat_{sid}"
-    st.session_state.setdefault(hist_key, [])
-    ai_key = f"ai_qs_{sid}"
-    st.caption("Ask a question about this plan and its supporting files.")
-    clicked = None
-    with st.expander('Ideas for questions'):
-        qcols = [st.container(), st.container()]
-        for i, q in enumerate(st.session_state.get(ai_key) or core.suggested_questions(sid)):
-            if qcols[i % 2].button(q, key=f"q_{sid}_{i}", width="stretch"):
-                clicked = q
-        if st.button("✨ Suggest questions with AI", key=f"aiq_{sid}"):
-            with st.spinner("Reading the IEP..."):
-                qs = run_safely(core.ai_questions, sid)
-            if qs:
-                st.session_state[ai_key] = qs
-                st.rerun()
-    with st.form(f"ask_{sid}", clear_on_submit=True):
-        typed = st.text_area("Your question", placeholder=f"What supports help {first} with independent work?", height=100)
-        if st.form_submit_button("Ask about this plan", type="primary") and typed.strip():
-            clicked = typed.strip()
-    if clicked:
-        with st.spinner("Reading the IEP..."):
-            result = run_safely(core.answer, sid, clicked)
+
+
+
+
+
+
+def modifications(sid, teacher=''):
+    """One shared focus, discussion and candidate queue, followed by human review."""
+    import integrations as I
+    import workspace_design as D
+    queue='suggestions_'+sid
+    st.session_state.setdefault(queue,[])
+    st.caption('Describe a concern or ask a question, explore possible supports, then send selected changes to review.')
+    pending=reviews.list_reviews(sid,open_only=True)
+    if pending:
+        st.info(f"{len(pending)} saved {'draft is' if len(pending)==1 else 'drafts are'} ready to compare.")
+        if st.button('Review saved drafts',width='stretch'): D.navigate(sid,'Review')
+    context_key='modification_focus_'+sid
+    focus=st.text_area('Question or observation',key=context_key,persist_state='session',height=120,
+                       placeholder='For example: what should change when a support helps in one course but is unavailable in another?')
+    with st.expander('Plan, reports and supporting information'):
+        evidence=I.evidence(sid)
+        st.caption(f'{len(evidence)} course evidence records · {len(core.list_supporting_docs(sid))} supporting files')
+        if evidence: D.evidence_cards(evidence)
+        else: st.caption('Add classroom reports in Progress & reports, or documents in Documents.')
+    left,right=st.columns(2)
+    if left.button('Discuss options',disabled=not focus.strip(),width='stretch'):
+        with st.spinner('Reading the plan and supporting context...'):
+            result=run_safely(core.answer,sid,focus.strip())
         if result:
-            st.session_state[hist_key].insert(0, (clicked, *result))
-    for question, reply, docs in st.session_state[hist_key]:
-        with st.chat_message("user"):
-            st.write(question)
-        with st.chat_message("assistant"):
-            st.markdown(reply)
+            st.session_state.setdefault('modification_discussion_'+sid,[]).insert(0,(focus,*result))
+    if right.button('Draft modifications',type='primary',disabled=not focus.strip(),width='stretch'):
+        with st.spinner('Drafting changes from the plan and evidence...'):
+            new=run_safely(core.suggest_updates,sid,focus.strip())
+        if new: st.session_state[queue]=new+st.session_state[queue]
+        elif new==[]: st.info('No supported changes were identified. Add a more specific observation or review the missing evidence.')
+    for question,answer,docs in st.session_state.get('modification_discussion_'+sid,[]):
+        with st.expander('Discussion: '+question[:75],expanded=True):
+            st.write(answer)
             if docs:
-                with st.expander("Supporting documents used"):
-                    for i, (d, m) in enumerate(docs, 1):
-                        st.markdown(f"**[D{i}] {m['source']}**")
-                        st.text(d)
-
-
-def summary(student_id, teacher=""):
-    sid = student_id
-    iep = core.get_iep(sid)
-    name = iep['student_name']
-    first = name.split()[0] if name else 'Student'
-    vcount = len(core.list_versions(sid))
-    sug_key = f'suggestions_{sid}'
-    st.session_state.setdefault(sug_key, [])
-    save_form = partial(globals()['save_form'], sid=sid, teacher=teacher)
-    key = f"summary_{sid}_{vcount}"
-    if st.button("Generate summary" if key not in st.session_state else "Regenerate summary"):
-        with st.spinner("Summarizing... (can take a minute on a laptop)"):
-            st.session_state[key] = run_safely(core.summarize, sid)
-    if st.session_state.get(key):
-        st.markdown(st.session_state[key])
-
-
-def updates(student_id, teacher=""):
-    sid = student_id
-    iep = core.get_iep(sid)
-    name = iep['student_name']
-    first = name.split()[0] if name else 'Student'
-    vcount = len(core.list_versions(sid))
-    sug_key = f'suggestions_{sid}'
-    st.session_state.setdefault(sug_key, [])
-    save_form = partial(globals()['save_form'], sid=sid, teacher=teacher)
-    st.caption("Describe an observation. We’ll use it with the student’s files and course reports to draft a change for your review.")
-    note = st.text_area("What have you noticed about this student?",
-                        placeholder=f"e.g. {first} met the first reading benchmark and gets overwhelmed by long worksheets.")
-    if st.button("Draft suggestions", type="primary", disabled=not note.strip()):
-        with st.spinner("Drafting suggestions..."):
-            new = run_safely(core.suggest_updates, sid, note.strip()) or []
-        st.session_state[sug_key] = new + st.session_state[sug_key]
-        if not new:
-            st.warning("No usable suggestions came back. Try a more specific note.")
-    for i, s in enumerate(list(st.session_state[sug_key])):
+                with st.expander('Sources used in this discussion'):
+                    for text,metadata in docs: st.caption(metadata.get('source','Document'));st.text(text)
+            st.caption('Discussion does not change the IEP. Draft modifications uses your focus and source evidence.')
+    with st.expander('Explore accommodation options'):
+        st.caption('Reference options for this discussion. Catalog evidence ratings are not independently verified.')
+        if st.button('Find relevant options',width='stretch'):
+            st.session_state['modification_options_'+sid]=run_safely(core.recommend_accommodations,sid,focus,k=15) or []
+        options=st.session_state.get('modification_options_'+sid,[])
+        if options:
+            chosen=st.selectbox('Accommodation option',options,format_func=lambda a:a['name'],key='modification_catalog_'+sid)
+            st.write(chosen.get('description',''))
+            st.caption('Specify how this option would be used before adding it to the draft.')
+            frequency=st.text_input('When / how often',key='modification_frequency_'+sid,persist_state='session')
+            amount=st.text_input('Amount or duration',key='modification_amount_'+sid,persist_state='session')
+            location=st.text_input('Course or setting',key='modification_location_'+sid,persist_state='session')
+            if st.button('Add option to draft',disabled=not all(v.strip() for v in [frequency,amount,location]),width='stretch'):
+                suggestion=core.accommodation_to_suggestion(sid,chosen)
+                suggestion['payload'].update(frequency=frequency.strip(),amount=amount.strip(),location=location.strip())
+                suggestion['reason']='Reference option selected for team review. '+chosen.get('description','')
+                suggestion['teacher_note']=focus
+                suggestion['evidence']=I.evidence(sid)+[{'source':'Accommodation catalog','text':chosen.get('description',''),'catalog_id':chosen.get('id'),'evidence_verified':False}]
+                st.session_state[queue].insert(0,suggestion)
+                st.success('Option added below. Edit its wording and send it for review.')
+    if st.session_state[queue]: st.markdown('**Draft changes**')
+    for i,suggestion in enumerate(list(st.session_state[queue])):
+        draft_id=suggestion.setdefault('_draft_id',uuid4().hex)
         with st.container(border=True):
-            st.markdown(f"**{s['section']}**  ·  _source: {s.get('source', '?')}_")
-            c1, c2 = st.container(), st.container()
-            c1.markdown("**Current wording**")
-            c1.write(s.get("current_text") or "(empty)")
-            c2.markdown("**Suggested wording**")
-            edited = c2.text_area("Suggested", s["suggested_text"], key=f"edit_{sid}_{i}_{len(st.session_state[sug_key])}",
-                                  label_visibility="collapsed")
-            if s["action"] == "add_service":
-                r = s["payload"]
-                st.caption(f"Row details: {r['frequency']} · {r['amount']} · {r['begin']} to {r['end']} · {r['location']}")
-            if s["action"] == "add_goal":
-                g = s["payload"]
-                st.caption("Benchmarks: " + " | ".join(b["text"] for b in g["benchmarks"] if b["text"]))
-            st.caption(f"Why: {s.get('reason', '')}")
-            a, r_ = st.columns(2)
-            if a.button("Submit for review", key=f"ok_{sid}_{i}"):
-                msg = run_safely(core.apply_suggestion, sid, {**s, "suggested_text": edited}, teacher)
-                if msg:
-                    st.session_state[sug_key].pop(i)
-                    flash(msg)
-                    st.session_state['pending_tool_'+sid]='Review'
-                    st.rerun()
-            if r_.button("❌ Reject", key=f"no_{sid}_{i}"):
-                core.log_decision(sid, s, "rejected", teacher)
-                st.session_state[sug_key].pop(i)
-                st.rerun()
+            st.markdown('**'+suggestion['section']+'**')
+            st.caption('Current wording');st.write(suggestion.get('current_text') or 'New plan item')
+            wording=st.text_area('Proposed wording',suggestion['suggested_text'],key=f'modification_candidate_{sid}_{draft_id}',persist_state='session')
+            suggestion['suggested_text']=wording
+            st.caption('Reason: '+suggestion.get('reason',''))
+            if suggestion['action']=='add_service':
+                row=suggestion['payload'];st.caption(f"{row['frequency']} · {row['amount']} · {row['location']}")
+            if st.button('Send change to review',key=f'modification_submit_{sid}_{draft_id}',type='primary',disabled=not wording.strip(),width='stretch'):
+                result=run_safely(core.apply_suggestion,sid,{**suggestion,'suggested_text':wording},teacher)
+                if result:
+                    st.session_state[queue].pop(i);flash(result);D.navigate(sid,'Review')
+            if st.button('Discard option',key=f'modification_discard_{sid}_{draft_id}'):
+                st.session_state[queue].pop(i);st.rerun()
 
 
 def form(student_id, teacher=""):
@@ -329,38 +301,6 @@ def form(student_id, teacher=""):
                 save_form(n, "Rights, ESY, LRE and team")
 
 
-def accommodations(student_id, teacher=""):
-    sid = student_id
-    iep = core.get_iep(sid)
-    name = iep['student_name']
-    first = name.split()[0] if name else 'Student'
-    vcount = len(core.list_versions(sid))
-    sug_key = f'suggestions_{sid}'
-    st.session_state.setdefault(sug_key, [])
-    save_form = partial(globals()['save_form'], sid=sid, teacher=teacher)
-    st.caption("From the public K-12 special education accommodations dataset (Hugging Face, CC0). "
-               "A reference list, not advice. The IEP team decides.")
-    try:
-        with st.spinner("Loading the accommodations dataset..."):
-            recs = core.recommend_accommodations(sid, k=10)
-    except Exception as e:  # noqa: BLE001
-        recs = None
-        st.error(f"Couldn't load the dataset: {e}\n\nRun `python prepare_dataset.py` once while online.")
-    if recs is not None and not recs:
-        st.info("No matching accommodations. Is the Eligibility filled in on page 1?")
-    for i, a in enumerate(recs or []):
-        with st.container(border=True):
-            badge = "✅ already in IEP" if a["already_in_iep"] else ""
-            st.markdown(f"**{a.get('name', '')}**  ·  evidence: *{a.get('evidence_level', '?')}*  {badge}")
-            st.write(a.get("description", ""))
-            st.caption(f"Matched on: {', '.join(a['matched_on'])}")
-            if not a["already_in_iep"] and st.button("Propose for IEP", key=f"acc_{sid}_{i}"):
-                sug = core.accommodation_to_suggestion(sid, a)
-                if sug:
-                    st.session_state[sug_key].insert(0, sug)
-                    st.session_state['pending_tool_'+sid] = 'Suggest updates'
-                    flash(f"Added '{a.get('name')}' as a suggestion.")
-                    st.rerun()
 
 
 def history(student_id, teacher=""):

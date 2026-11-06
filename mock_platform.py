@@ -14,6 +14,7 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from local_store import DATA_DIR
+import local_store as store
 
 LTI = 'https://purl.imsglobal.org/spec/lti/claim/'
 NRPS = 'https://purl.imsglobal.org/spec/lti-nrps/claim/namesroleservice'
@@ -35,6 +36,10 @@ def keypair(name):
     return serialization.load_pem_private_key(path.read_bytes(), password=None)
 
 def roster(provider):
+    if provider in ('dataset-demo','hk-naset-v1'):
+        snapshot=store.get('sis','dataset-demo')
+        if not snapshot: raise ValueError('Example cohort has not been installed')
+        return snapshot
     if provider not in PROVIDERS: raise ValueError('Unknown demo provider')
     def ref(identifier): return {'sourcedId': f'{provider}:{identifier}'}
     common = {'status': 'active', 'dateLastModified': '2026-11-01T00:00:00Z'}
@@ -161,14 +166,22 @@ class Handler(BaseHTTPRequestHandler):
                 if resource == 'lineitems':
                     if len(parts) == 5:
                         self.authorized(SCOPES[1], context)
-                        return self.send_json([{'id': self.server.base+path+'/task-1', 'label': course['title']+' supported practice',
-                                                'scoreMaximum': 100, 'resourceLinkId': context+':iep', 'tag': 'synthetic'}], media='application/vnd.ims.lis.v2.lineitemcontainer+json')
-                    if len(parts) == 7 and parts[5] == 'task-1' and parts[6] == 'results':
+                        gradebook=store.get('mock_gradebook',context)
+                        items=gradebook['items'] if gradebook else [{'key':'task-1','label':course['title']+' supported practice','scoreMaximum':100}]
+                        return self.send_json([{'id':self.server.base+path+'/'+i['key'],'label':i['label'],'scoreMaximum':i['scoreMaximum'],
+                                                'resourceLinkId':context+':iep','tag':'example'} for i in items],media='application/vnd.ims.lis.v2.lineitemcontainer+json')
+                    if len(parts) == 7 and parts[6] == 'results':
                         self.authorized(SCOPES[2], context)
                         students = [e for e in enrolled if e['role'] == 'student']
+                        teacher=next(e['user']['sourcedId']+':lti' for e in enrolled if e['role']=='teacher')
                         results = [{'id': self.server.base+path+'/'+e['user']['sourcedId'], 'userId': e['user']['sourcedId']+':lti',
                                     'resultScore': 78 if 'math' in context else 86, 'resultMaximum': 100,
-                                    'comment': 'Synthetic instructor observation: extended time used; task completed with prompts.'} for e in students]
+                                    'scoringUserId':teacher,'comment':'Extended time was used; the task was completed with prompts.'} for e in students]
+                        gradebook=store.get('mock_gradebook',context)
+                        if gradebook:
+                            entry=next(i for i in gradebook['items'] if i['key']==parts[5])
+                            results=[{**r,'id':self.server.base+path+'/'+r['userId'],'scoreOf':self.server.base+path.rsplit('/results',1)[0]} for r in entry['results']]
+                        elif parts[5]!='task-1': raise ValueError('Unknown line item')
                         user_id = query.get('user_id', [None])[0]
                         return self.send_json([r for r in results if user_id is None or r['userId'] == user_id], media='application/vnd.ims.lis.v2.resultcontainer+json')
             return self.send_json({'error': 'not_found'}, 404)

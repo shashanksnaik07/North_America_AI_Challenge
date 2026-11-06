@@ -14,6 +14,30 @@ from local_store import DATA_DIR, atomic_json
 
 def digest(data): return hashlib.sha256(data).hexdigest()
 
+def ensure_form_tree(writer):
+    """Restore the canonical form tree when page selection retained only widgets.
+
+    MuPDF's select() keeps widget parent chains but can drop the catalog's
+    AcroForm. PDF viewers still paint those appearances, hiding the data loss.
+    """
+    from pypdf.generic import ArrayObject, DictionaryObject, NameObject
+    roots=[];seen=set()
+    for page in writer.pages:
+        for ref in page.get('/Annots',[]):
+            item=ref.get_object()
+            if item.get('/Subtype')!='/Widget':continue
+            root=ref
+            while item.get('/Parent'):
+                root=item['/Parent'].indirect_reference;item=root.get_object()
+            identity=(root.idnum,root.generation)
+            if identity not in seen:roots.append(root);seen.add(identity)
+    if not roots:return
+    form=writer._root_object.get('/AcroForm')
+    if form:form=form.get_object()
+    else:
+        form=DictionaryObject();writer._root_object[NameObject('/AcroForm')]=writer._add_object(form)
+    form[NameObject('/Fields')]=ArrayObject(roots)
+
 def source_bytes(document):
     path = (DATA_DIR / document['source']).resolve()
     if not path.is_relative_to(DATA_DIR.resolve()): raise ValueError('Invalid document location.')
@@ -88,8 +112,10 @@ def ensure_document(sid, record):
     save_document(sid, document)
     return document
 
-def validate_binding(document, binding):
-    pages = inspect_pdf(source_bytes(document))
+def validate_binding(document, binding, pages=None):
+    if pages is None:
+        with fitz.open(stream=source_bytes(document),filetype='pdf') as source:
+            pages=[{'unrotated_width':p.cropbox.width,'unrotated_height':p.cropbox.height} for p in source]
     page = binding.get('page')
     if not isinstance(page, int) or not 0 <= page < len(pages): raise ValueError('Invalid page.')
     rect = binding.get('rect', [])
@@ -134,12 +160,34 @@ def _put_text(page, rect, value, color=(0, 0, 0)):
         size -= .5
     raise ValueError('Text does not fit the selected PDF area. Enlarge the binding or shorten the wording.')
 
+def binding_text(page,rect,value,binding):
+    if binding.get('format')=='labelled':
+        from native_templates import display_value
+        text=display_value(value)
+    else:text=ontology.text(value) if value is not None else ''
+    if binding.get('name_part')=='first':text=text.split(' ',1)[0]
+    elif binding.get('name_part')=='last':text=text.split(' ',1)[-1]
+    if binding.get('year_part')=='start':text=text.split('-',1)[0]
+    elif binding.get('year_part')=='end':text=text.split('-',1)[-1]
+    if text and binding.get('suffix'):text+=binding['suffix']
+    if binding.get('continuation_page'):
+        from native_templates import fits
+        if not fits(rect,text):
+            suffix=f"See continuation, page {binding['continuation_page']}."
+            if not fits(rect,suffix):suffix=f"See p. {binding['continuation_page']}"
+            words=text.split()
+            while words and not fits(rect,' '.join(words)+' ... '+suffix):words.pop()
+            text=(' '.join(words)+' ... ' if words else '')+suffix
+    return text
+
+
 def render_document(document, record, append_unmapped=True):
     """Modify a copy. Original bytes and field-tree values are preserved separately."""
     original = source_bytes(document)
     delta = changes(document['baseline'], record)
     unmapped = []
     with fitz.open(stream=original, filetype='pdf') as doc:
+        page_geometry=[{'unrotated_width':p.cropbox.width,'unrotated_height':p.cropbox.height} for p in doc]
         applied = set()
         for change in delta:
             key = binding_key(document, change['path'])
@@ -154,13 +202,14 @@ def render_document(document, record, append_unmapped=True):
                 except (KeyError, IndexError): value = None
                 change = {**change, 'after': value}
             for binding in bindings:
-                validate_binding(document, binding)
+                validate_binding(document, binding, page_geometry)
                 page = doc[binding['page']]
                 rect = fitz.Rect(binding['rect'])
+                displayed=binding_text(page,rect,change['after'],binding)
                 if binding.get('widget'):
                     widget = next((w for w in page.widgets() or [] if w.field_name == binding['widget']), None)
                     if widget is None: raise ValueError('The mapped PDF field is missing.')
-                    widget.field_value = '' if change['after'] is None else ontology.text(change['after'])
+                    widget.field_value = displayed
                     if not widget.field_flags & fitz.PDF_TX_FIELD_IS_MULTILINE:
                         length = fitz.get_text_length(widget.field_value, fontname='helv', fontsize=1)
                         size = min(widget.text_fontsize or 11, (rect.width-4)/max(length, 1), (rect.height-4)*.7)
@@ -169,13 +218,13 @@ def render_document(document, record, append_unmapped=True):
                         widget.text_fontsize = size
                     else:
                         trial = fitz.open(); trial_page = trial.new_page(width=page.cropbox.width, height=page.cropbox.height)
-                        _put_text(trial_page, rect, change['after']); trial.close()
+                        _put_text(trial_page, rect, displayed); trial.close()
                         widget.text_fontsize = 0  # PDF auto-size, after verifying the minimum readable fit
                     widget.update()
                 else:
                     page.add_redact_annot(rect, fill=(1, 1, 1))
                     page.apply_redactions(graphics=0)
-                    _put_text(page, rect, change['after'])
+                    _put_text(page, rect, displayed)
         if unmapped and append_unmapped:
             buffer = io.BytesIO(); styles = getSampleStyleSheet()
             story = [Paragraph('IEP review addendum - fields without a PDF binding', styles['Heading1']),

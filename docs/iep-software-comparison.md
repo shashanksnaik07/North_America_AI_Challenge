@@ -34,8 +34,8 @@ My caseload
 Student workspace
   Overview             Student information, current plan, pending drafts
   IEP                  Original PDF + contextual tools
-    View IEP / Edit draft / Ask / Review drafts
-    More: Suggest updates / Accommodations / History / Summary
+    View IEP / Edit draft / Suggested modifications / Review drafts
+    Suggested modifications: discussion / accommodation options / draft queue
     PDF / Form, page selector, zoom, downloads
   Documents            Current IEP, supporting files, IEP history
   Progress & reports   Course evidence, stakeholder observations, draft updates

@@ -15,7 +15,7 @@ import pdf_workspace as P
 import reviews as R
 import workspace_ui as U
 
-PRIMARY_TASKS = ['Read', 'Edit', 'Ask', 'Review']
+PRIMARY_TASKS = ['Read', 'Edit', 'Modifications', 'Review']
 SECTION_PREFIXES = {
     'Student details': ('student_name','dob','grade','school_year','iep_from','iep_to','meta'),
     'Present levels (PLAAFP)': ('profile',), 'Annual goals': ('goals',),
@@ -61,9 +61,26 @@ def caseload(students):
     with st.container(horizontal=True,vertical_alignment='bottom'):
         query=st.text_input('Find a student',placeholder='Name, school or case manager',width=360)
         show=st.selectbox('Show',['All students','Needs review'],width=190)
-    visible=[(sid,r) for sid,r in records if (show!='Needs review' or counts[sid]) and query.casefold() in ' '.join([r['student_name'],r['meta']['school'],r['meta']['case_manager']]).casefold()]
+    case_filter,state_filter,template_filter='All profiles','All states','All templates'
+    seeded=[r for _,r in records if r.get('extensions',{}).get('mock_cohort')]
+    if seeded:
+        with st.container(horizontal=True):
+            case_filter=st.selectbox('Mock profile',['All profiles']+sorted({r['extensions']['mock_profile_type'] for r in seeded}),width=350)
+            state_filter=st.selectbox('Template state',['All states']+sorted({r['extensions']['mock_template_state'] for r in seeded}),width=200)
+            choices=['All templates']+sorted({r['extensions']['mock_template_id'] for r in seeded if state_filter=='All states' or r['extensions']['mock_template_state']==state_filter})
+            template_filter=st.selectbox('NASET form',choices,format_func=lambda x:x if x=='All templates' else O.template(x)['title'],width=350)
+        st.caption(f'{len(seeded)} practice records · 12 support profiles across NASET state templates.')
+    visible=[(sid,r) for sid,r in records if (show!='Needs review' or counts[sid]) and query.casefold() in ' '.join([r['student_name'],r['meta']['school'],r['meta']['case_manager']]).casefold()
+             and (case_filter=='All profiles' or r.get('extensions',{}).get('mock_profile_type')==case_filter)
+             and (state_filter=='All states' or r.get('extensions',{}).get('mock_template_state')==state_filter)
+             and (template_filter=='All templates' or r.get('extensions',{}).get('mock_template_id')==template_filter)]
     st.caption('Plan end dates come from the saved IEP. They are not verified review or compliance deadlines.')
     if not visible: st.info('No students match these filters. Clear the search or choose All students.')
+    if len(visible)>20:
+        page_count=(len(visible)+19)//20
+        page=st.selectbox('Caseload page',range(page_count),format_func=lambda x:f'{x+1} of {page_count}',width=150)
+        st.caption(f'Showing {page*20+1}–{min((page+1)*20,len(visible))} of {len(visible)} students')
+        visible=visible[page*20:(page+1)*20]
     with st.container(key='caseload-list'):
         for sid,r in visible:
             with st.container(border=True):
@@ -71,6 +88,7 @@ def caseload(students):
                 with name:
                     if st.button(r['student_name'],type='tertiary',key='profile_'+sid): open_student(sid,'Overview')
                     st.caption('Case manager: '+(r['meta']['case_manager'] or 'Not recorded'))
+                    if r.get('extensions',{}).get('mock_profile_type'): st.caption(r['extensions']['mock_profile_type'])
                 with school:
                     st.write(r['meta']['school'] or 'School not recorded')
                     st.caption('Grade '+(r['grade'] or 'not recorded'))
@@ -155,7 +173,15 @@ def overview(sid, record):
     fact('Annual goals',str(len(record['goals'])))
     with st.expander('Student strengths'):
         st.write(record['profile'].get('strengths') or 'No strengths recorded yet.')
-    st.caption('Choose Edit draft to propose a change, or Ask for help understanding this plan.')
+    st.caption('Choose Edit draft for a direct edit, or Suggested modifications to discuss evidence and draft a change.')
+    metadata=store.get('mock_student',sid)
+    if metadata:
+        with st.expander('Case and template provenance'):
+            st.write(metadata['case_label']+' · '+metadata['state'])
+            st.caption('Practice record built from the listed sources. The original NASET layout contains the plan; linked continuation pages hold overflow and additional details.')
+            st.link_button('NASET reference form',metadata['naset']['url'])
+            st.link_button('Hong Kong example',metadata['edb']['url'])
+            st.download_button('Download provenance',json.dumps(metadata,indent=2),sid+'-provenance.json','application/json')
 
 def edit_panel(sid,record,actor):
     st.subheader('Propose an edit')
@@ -215,11 +241,18 @@ def edit_panel(sid,record,actor):
 
 def evidence_cards(items):
     for item in items:
-        title=item.get('course') or item.get('source') or item.get('citation') or 'Supporting information'
-        st.markdown('**'+str(title)+'**')
-        text=item.get('observation') or item.get('text') or item.get('label')
+        course=item.get('course')
+        author=item.get('reporter')
+        role=item.get('reporter_role')
+        title=' · '.join(str(v) for v in [author,role,course] if v) or item.get('source') or item.get('citation') or 'Supporting information'
+        st.markdown('**'+title+'**')
+        if item.get('kind')=='lti_result':
+            grade=f"{item['score']:g} / {item.get('maximum',1):g}" if isinstance(item.get('score'),(int,float)) else 'Not graded'
+            st.write(item.get('label','Assignment')+' — '+grade)
+        text=item.get('observation') or item.get('text') or item.get('label') or item.get('description')
         if text: st.write(text)
-        details=[item.get('reporter'),item.get('period_end') or item.get('fetched_at'),item.get('citation')]
+        stamp=('Graded '+item['graded_at'][:10]) if item.get('graded_at') else ('Synced '+item['fetched_at'][:10]) if item.get('kind')=='lti_result' and item.get('fetched_at') else item.get('period_end')
+        details=[item.get('source'),stamp,item.get('citation')]
         st.caption(' · '.join(str(v) for v in details if v))
 
 def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imports=False,imports_only=False,review_id=None):
@@ -323,6 +356,9 @@ def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imp
 def acrobat_workspace(sid,record,actor,role):
     if 'pending_tool_'+sid in st.session_state: st.session_state['active_tool_'+sid]=st.session_state.pop('pending_tool_'+sid)
     tool=st.session_state.setdefault('active_tool_'+sid,'Read')
+    if tool in ('Ask','Suggest updates','Accommodations','Summary'):
+        tool='Read' if tool=='Summary' else 'Modifications'
+        st.session_state['active_tool_'+sid]=tool
     if 'pending_field_'+sid in st.session_state:
         field=st.session_state.pop('pending_field_'+sid)
         st.session_state['editor_field_'+sid]=field
@@ -330,13 +366,10 @@ def acrobat_workspace(sid,record,actor,role):
     if 'pending_view_'+sid in st.session_state: st.session_state['document_view_'+sid]=st.session_state.pop('pending_view_'+sid)
     count=len(R.list_reviews(sid,open_only=True))
     with st.container(horizontal=True,vertical_alignment='center',key='workspace-tasks'):
-        for task,icon in [('Read','description'),('Edit','edit'),('Ask','chat_bubble'),('Review','fact_check')]:
-            title={'Read':'View IEP','Edit':'Edit draft','Ask':'Ask','Review':'Review drafts'}[task]
+        for task,icon in [('Read','description'),('Edit','edit'),('Modifications','auto_fix_high'),('Review','fact_check')]:
+            title={'Read':'View IEP','Edit':'Edit draft','Modifications':'Suggested modifications','Review':'Review drafts'}[task]
             if task=='Review' and count: title+=f' ({count})'
             if st.button(title,icon=f':material/{icon}:',type='primary' if tool==task else 'secondary',key='task_'+sid+task): navigate(sid,task)
-        with st.popover('More',icon=':material/more_horiz:'):
-            for task in ['Suggest updates','Accommodations','History','Summary']:
-                if st.button(task,key='more_'+sid+task,width='stretch'): navigate(sid,task)
     with st.container(key='document-layout-read' if tool=='Read' else 'document-layout'):
         canvas,pane=st.columns([2.1,1],gap='medium')
         item=None;field=None
@@ -346,13 +379,9 @@ def acrobat_workspace(sid,record,actor,role):
                 elif tool=='Edit': field=edit_panel(sid,record,actor)
                 elif tool=='Review': item=review_inbox(actor,role,sid,compact=True)
                 else:
-                    st.subheader({'Ask':'Ask about this IEP','Suggest updates':'Draft an update','Accommodations':'Accommodation library','History':'Plan history','Summary':'Plan summary'}[tool])
-                    if tool=='Ask':
-                        tools.ask(sid,actor)
-                        st.divider()
-                        st.caption('Have a new classroom observation?')
-                        if st.button('Draft an IEP update',width='stretch'): navigate(sid,'Suggest updates')
-                    else: {'Suggest updates':tools.updates,'Accommodations':tools.accommodations,'History':tools.history,'Summary':tools.summary}[tool](sid,actor)
+                    st.subheader('Suggested modifications' if tool=='Modifications' else 'Plan history')
+                    if tool=='Modifications': tools.modifications(sid,actor)
+                    else: tools.history(sid,actor)
         with canvas:
             document=(item or {}).get('document') or P.ensure_document(sid,record)
             if tool=='Review' and item and not item.get('document'):
@@ -362,6 +391,7 @@ def acrobat_workspace(sid,record,actor,role):
             source=P.source_bytes(document);pages=P.inspect_pdf(source);scope=sid+document['sha256'][:8]
             page_key='canvas_page_'+scope
             if 'pending_page_'+sid in st.session_state: st.session_state[page_key]=st.session_state.pop('pending_page_'+sid)
+            if page_key not in st.session_state:st.session_state[page_key]=document.get('default_page',0)
             with st.container(horizontal=True,vertical_alignment='bottom'):
                 view=st.segmented_control('View',['PDF','Form'],default='PDF',required=True,key='document_view_'+sid,persist_state='session')
                 if view=='PDF':
@@ -395,6 +425,7 @@ def acrobat_workspace(sid,record,actor,role):
                 try: current=P.render_document(document,record)[0]
                 except ValueError as exc: st.error(str(exc));current=source
             if document['origin']=='generated baseline': st.caption('Preview created from the saved IEP. Imported PDFs keep their original layout.')
+            if document.get('page_labels'): st.caption(document['page_labels'][page])
             show_fields=tool=='Edit'
             fields=[{'path':path,'rect':P.view_rectangle(document,page,b['rect'])} for path,bindings in document['bindings'].items() for b in bindings if b['page']==page]
             png=P.page_image(current,page,overlays,color,scale=1.5)
@@ -432,7 +463,7 @@ def resources_workspace(sid,actor,section=None):
                 if upload is None: st.error('Choose a file first.')
                 else:
                     text=U.attempt(core.extract_text,upload.name,upload.getvalue())
-                    if text and U.attempt(core.add_supporting_doc,sid,upload.name,text): U.notice('File added. It is available to Ask and suggested updates.')
+                    if text and U.attempt(core.add_supporting_doc,sid,upload.name,text): U.notice('File added. It is available to Suggested modifications.')
         for name in core.list_supporting_docs(sid): st.write('📄 '+name)
         if not core.list_supporting_docs(sid): st.caption('No supporting files yet.')
         return
@@ -468,8 +499,8 @@ def connections(sid,actor):
         st.download_button('Export canonical IEP data',json.dumps(O.canonical(core.get_iep(sid),sid,evidence=I.evidence(sid)),indent=2),'iep-canonical.json','application/json')
 
 def course_reports(sid,actor):
-    st.subheader('Course reports')
-    st.caption('Collect classroom observations in one place. Reports inform suggestions; they never change the IEP automatically.')
+    st.subheader('Grades & course feedback')
+    st.caption('Review assignment grades and instructor comments alongside student and family reports.')
     context=I.student_context(sid)
     if not context or not context['classes']:
         st.info('Connect a school roster to choose the student’s courses.')
@@ -477,19 +508,39 @@ def course_reports(sid,actor):
             st.session_state['setup_section']='Connections';st.rerun()
         return
     items=I.evidence(sid)
+    course_filter=st.selectbox('Filter by course',['All courses']+[c['title'] for c in context['classes']],key='evidence_course_'+sid)
+    visible=[r for r in items if course_filter=='All courses' or r.get('course')==course_filter]
+    graded=[r for r in visible if r['kind']=='lti_result']
+    st.markdown('**LMS assignments**')
+    if graded:
+        rows=[{'Course':r['course'],'Assignment':r.get('label','Assignment'),
+               'Grade':f"{r['score']:g} / {r.get('maximum',1):g}" if isinstance(r.get('score'),(int,float)) else 'Not graded',
+               'Instructor':r.get('reporter','Author not provided by LMS'),
+               'Date':(r.get('graded_at') or '')[:10] or 'Not supplied','Comment':r.get('observation','')} for r in graded]
+        st.dataframe(rows,hide_index=True,width='stretch')
+        st.caption('Assignment results are context, not a measure of accommodation effectiveness. Dates are shown only when supplied by the platform.')
+        st.markdown('**Instructor feedback by assignment**')
+        evidence_cards([r for r in graded if r.get('observation')])
+    else:st.info('No LMS grades are available for this course selection. Refresh a course to retrieve shared assignments and comments.')
+    direct=[r for r in visible if r['kind']=='report']
+    if direct:
+        with st.expander('Student, family & other reports',expanded=True):evidence_cards(direct)
     aggregation=I.aggregate_reports(sid)
+    if items:
+        if st.button('Use these reports to draft an update',type='primary'):navigate(sid,'Modifications')
     if aggregation:
+      with st.expander('Accommodation report summary'):
         for group in aggregation:
             with st.container(border=True):
                 st.markdown('**'+group['Accommodation']+'**')
                 st.caption(f"{group['Reports']} reports · {group['Courses']}")
                 st.write('Observed outcomes: '+group['Outcomes'])
                 if group['Mixed observations']: st.caption('Observations differ across courses. Review the examples before drawing conclusions.')
-        if st.button('Use these reports to draft an update',type='primary'): navigate(sid,'Suggest updates')
     with st.expander('Add a classroom report',expanded=not bool(aggregation)):
         with st.form('course_report_'+sid):
             course=st.selectbox('Course',context['classes'],format_func=lambda c:c['title'])
             reporter=st.text_input('Your name',value=actor)
+            reporter_role=st.selectbox('Your role',['Teacher','Parent / caregiver','Student','Related service provider','Case manager'])
             accommodation=st.text_input('Accommodation used',placeholder='For example, extended time')
             usage=st.selectbox('How often was it used?',['Every opportunity','Most opportunities','Sometimes','Not used'])
             effectiveness=st.selectbox('What did you observe?',['Helpful','Mixed','Not helpful','Insufficient evidence'])
@@ -497,10 +548,10 @@ def course_reports(sid,actor):
             end=st.date_input('Reporting period ends',value=dt.date.today())
             observation=st.text_area('Examples and observations',placeholder='Describe the task, how the accommodation was used, and what you noticed.')
             if st.form_submit_button('Save report',type='primary'):
-                if U.attempt(I.submit_report,sid,course['sourcedId'],reporter,accommodation,usage,effectiveness,observation,start,end): U.notice('Report saved. It is now available to suggested updates.')
+                if U.attempt(I.submit_report,sid,course['sourcedId'],reporter,accommodation,usage,effectiveness,observation,start,end,reporter_role): U.notice('Report saved. It is now available to Suggested modifications.')
     with st.expander('Refresh course information'):
         course=st.selectbox('Course to refresh',context['classes'],format_func=lambda c:c['title'])
-        st.caption('Fetches course membership and results shared with this tool through the demo LMS.')
+        st.caption('Retrieves grades, assignment comments and course membership shared by the connected LMS.')
         if st.button('Refresh course'):
             records=U.attempt(I.sync_lms,sid,course['sourcedId'])
             if records is not None: U.notice(f'Course refreshed. {len(records)} results available.')

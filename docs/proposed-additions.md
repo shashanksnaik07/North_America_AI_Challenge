@@ -16,8 +16,9 @@ There are two main tabs:
 * **Student workspace** contains **Overview, IEP, Documents, Progress & reports**.
   The IEP section keeps the original PDF in the center, with page selection,
   zoom, downloads, field selection and region mapping. **View IEP, Edit draft,
-  Ask, Review drafts** are visible actions; **Suggest updates, Accommodations,
-  History, Summary** are under More. The equivalent structured form is an alternate
+  Suggested modifications, Review drafts** are visible actions. Questions,
+  accommodation options and suggested changes share one modification workflow;
+  history is in Documents and summary generation has been removed. The structured form is an alternate
   document view, retaining the existing Alabama fields and template extensions.
 
 **Tools & setup** contains templates, roster synchronization, explicit student

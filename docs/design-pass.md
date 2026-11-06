@@ -13,10 +13,11 @@ The original PDFs, review rules, AI services and integration adapters are unchan
   Keep a student selector above these sections. Move templates, connections,
   example loading and removal into Tools & setup, away from routine work.
 * Open the IEP in **View IEP**, with the PDF and a brief plan overview. Show
-  **View IEP, Edit draft, Ask, Review drafts** as visible actions, including the
+  **View IEP, Edit draft, Suggested modifications, Review drafts** as visible actions, including the
   number of pending reviews.
-* Group less frequent tools (suggestions, accommodation library, history, summary)
-  under **More**, with contextual shortcuts from Ask and Course reports.
+* Combine questions, accommodation options and AI draft changes in **Suggested
+  modifications**, sharing one question/observation and candidate queue. History
+  lives under Documents. Generate summary has been removed.
 * Group editing fields into familiar IEP sections. Keep numerical coordinates,
   raw JSON, PDF replacement and template ontology controls in advanced disclosures.
 * Preserve field-edit drafts across tool and student changes within the session.

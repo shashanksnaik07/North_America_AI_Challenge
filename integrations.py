@@ -107,18 +107,36 @@ def sync_lms(sid, course_id, base=BASE):
         results = _pages(item['id']+'/results', token, base=base, media='application/vnd.ims.lis.v2.resultcontainer+json')
         for result in results:
             if result['userId'] != learner['user_id']: continue
-            key = hashlib.sha256((sid+'|'+item['id']+'|'+learner['user_id']).encode()).hexdigest()
-            records.append({'id': key, 'student_id': sid, 'sis_id': context['link']['sourced_id'], 'kind': 'lti_result',
-                            'course_id': course_id, 'course': claims[LTI+'context']['title'], 'source': 'LTI Advantage AGS result',
-                            'label': item['label'], 'score': result.get('resultScore'), 'maximum': result.get('resultMaximum'),
-                            'observation': result.get('comment', ''), 'fetched_at': store.now(), 'source_url': item['id'], 'synthetic': True})
+            records.append(lms_result_record(sid, context['link']['sourced_id'], course_id,
+                           claims[LTI+'context']['title'], item, result, members))
     # Replace a course snapshot, including an empty result set, so deletions cannot linger.
     store.put('lms', sid+'|'+course_id, {'id': sid+'|'+course_id, 'student_id': sid, 'course_id': course_id,
               'sis_id': context['link']['sourced_id'], 'records': records, 'members': members, 'synced_at': store.now(),
               'launch': {'issuer': claims['iss'], 'deployment': DEPLOYMENT, 'context': claims[LTI+'context'], 'verified': True}})
     return records
 
-def submit_report(sid, course_id, reporter, accommodation, usage, effectiveness, observation, period_start, period_end):
+def lms_result_record(sid, sis_id, course_id, course_title, item, result, members):
+    """AGS scoringUserId identifies the grader; NRPS supplies course membership/name.
+
+    Do not substitute the launch user or any arbitrary instructor when the grader
+    is absent. AGS results need not include a grading timestamp.
+    """
+    author=next((m for m in members if m['user_id']==result.get('scoringUserId') and m.get('status','Active')=='Active'),None)
+    instructor=bool(author and ROLE+'Instructor' in author.get('roles',[]))
+    key=hashlib.sha256((sid+'|'+item['id']+'|'+result['userId']).encode()).hexdigest()
+    return {'id':key,'student_id':sid,'sis_id':sis_id,'kind':'lti_result','course_id':course_id,'course':course_title,
+        'source':'LMS graded assignment comment' if result.get('comment') else 'LMS assignment result',
+        'label':item['label'],'line_item_id':item['id'],'result_id':result.get('id'),
+        'score':result.get('resultScore'),'maximum':result.get('resultMaximum',1),
+        'reporter':author.get('name','Name unavailable') if author else 'Author not provided by LMS',
+        'reporter_role':'Teacher' if instructor else 'LMS contributor' if author else 'Unknown',
+        'scoring_user_id':result.get('scoringUserId'),'author_verified_in_course':instructor,
+        'observation':result.get('comment') or '', 'fetched_at':store.now(),
+        'graded_at':result.get('https://example.org/iep/graded_at'),
+        'source_url':item['id'],'synthetic':True}
+
+
+def submit_report(sid, course_id, reporter, accommodation, usage, effectiveness, observation, period_start, period_end, reporter_role='Teacher'):
     context = student_context(sid)
     course = next((c for c in (context or {}).get('classes', []) if c['sourcedId'] == course_id), None)
     if not course: raise ValueError('Choose a linked course.')
@@ -127,9 +145,9 @@ def submit_report(sid, course_id, reporter, accommodation, usage, effectiveness,
     if start > end: raise ValueError('Reporting period ends before it starts.')
     key = uuid.uuid4().hex
     report = {'id': key, 'student_id': sid, 'sis_id': context['link']['sourced_id'], 'kind': 'report', 'course_id': course_id,
-              'course': course['title'], 'reporter': reporter.strip(), 'accommodation': accommodation.strip(), 'usage': usage,
+              'course': course['title'], 'reporter': reporter.strip(), 'reporter_role':reporter_role, 'accommodation': accommodation.strip(), 'usage': usage,
               'effectiveness': effectiveness, 'observation': observation.strip(), 'period_start': str(start), 'period_end': str(end),
-              'fetched_at': store.now(), 'source': 'App-owned course accommodation report (self-identified demo author)', 'synthetic': True}
+              'fetched_at': store.now(), 'source': 'Direct stakeholder report', 'synthetic': True}
     store.put('report', key, report)
     return key
 
@@ -137,9 +155,9 @@ def evidence(sid):
     context = student_context(sid)
     if not context: return []
     courses = {c['sourcedId'] for c in context['classes']}; sis_id = context['link']['sourced_id']
-    reports = [r for r in store.all_records('report') if r['student_id'] == sid and r['sis_id'] == sis_id and r['course_id'] in courses]
+    reports = [r for r in store.all_records('report') if r['student_id'] == sid and r['sis_id'] == sis_id and r['course_id'] in courses and not r.get('superseded_by_lms')]
     snapshots = [s for s in store.all_records('lms') if s['student_id'] == sid and s['sis_id'] == sis_id and s['course_id'] in courses]
-    return sorted(reports + [r for s in snapshots for r in s['records']], key=lambda r: (r['course'], r['fetched_at']))
+    return sorted(reports + [r for s in snapshots for r in s['records']], key=lambda r: (0 if r['kind']=='lti_result' and r.get('observation') and r.get('score') is not None else 1,r['course'],r['fetched_at']))
 
 def evidence_context(sid, limit_chars=16000):
     records = evidence(sid)
