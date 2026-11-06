@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="viewer.css">
+</head>
+<body>
+  <section id="viewer" aria-label="IEP PDF viewer">
+    <div class="toolbar" aria-label="PDF page navigation">
+      <div class="navigation">
+        <button id="first" type="button" aria-label="First page" title="First page (Home)">|‹</button>
+        <button id="previous" type="button" aria-label="Previous page" title="Previous page (Page Up)">‹</button>
+        <label for="page-number">Page</label>
+        <input id="page-number" type="number" min="1" value="1" aria-label="Page number" inputmode="numeric">
+        <span id="page-total">of 1</span>
+        <button id="next" type="button" aria-label="Next page" title="Next page (Page Down)">›</button>
+        <button id="last" type="button" aria-label="Last page" title="Last page (End)">›|</button>
+      </div>
+      <span class="scroll-hint">Scroll through pages</span>
+    </div>
+    <div id="viewport" tabindex="0" role="region" aria-label="Scrollable PDF pages" aria-describedby="instructions">
+      <div id="pages"></div>
+    </div>
+    <p id="instructions">Scroll to read. Use Page Up / Page Down or enter a page number to jump.</p>
+    <span id="announcement" class="sr-only" aria-live="polite"></span>
+  </section>
+  <script src="viewer.js"></script>
+</body>
+</html>

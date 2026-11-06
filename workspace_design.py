@@ -1,9 +1,9 @@
 """Task-oriented presentation; all persistence and approval rules stay in services."""
-import base64
 import copy
 import datetime as dt
 from html import escape
 import json
+import uuid
 import streamlit as st
 import core
 import document_tools as tools
@@ -12,6 +12,7 @@ import integrations as I
 import local_store as store
 import ontology as O
 import pdf_workspace as P
+import pdf_viewer as V
 import reviews as R
 import workspace_ui as U
 
@@ -388,14 +389,13 @@ def acrobat_workspace(sid,record,actor,role):
                 st.info('This source has no readable PDF. Compare the extracted information in Review.')
                 st.text(item.get('source_text') or 'No text could be extracted. Review the source file before approving.')
                 return
-            source=P.source_bytes(document);pages=P.inspect_pdf(source);scope=sid+document['sha256'][:8]
-            page_key='canvas_page_'+scope
-            if 'pending_page_'+sid in st.session_state: st.session_state[page_key]=st.session_state.pop('pending_page_'+sid)
-            if page_key not in st.session_state:st.session_state[page_key]=document.get('default_page',0)
+            source=P.source_bytes(document);scope=sid+document['sha256'][:8]
+            navigation_key='pdf_navigation_'+scope
+            if 'pending_page_'+sid in st.session_state:
+                st.session_state[navigation_key]={'page':st.session_state.pop('pending_page_'+sid),'token':uuid.uuid4().hex}
             with st.container(horizontal=True,vertical_alignment='bottom'):
                 view=st.segmented_control('View',['PDF','Form'],default='PDF',required=True,key='document_view_'+sid,persist_state='session')
                 if view=='PDF':
-                    page=st.selectbox('Page',range(len(pages)),format_func=lambda i:f'{i+1} of {len(pages)}',key=page_key,width=105,persist_state='session')
                     zoom=st.selectbox('Zoom',[100,125,150,200],format_func=lambda x:'Fit width' if x==100 else f'{x}%',key='zoom_'+sid,width=125,persist_state='session')
                 with st.popover('Download',icon=':material/download:'):
                     try: st.download_button('Proposed IEP' if item else 'Current IEP',P.render_document(document,item['candidate'] if item else record)[0],'iep-proposed.pdf' if item else 'iep.pdf','application/pdf',width='stretch')
@@ -408,42 +408,38 @@ def acrobat_workspace(sid,record,actor,role):
                         st.markdown('**'+label(d['path'])+'**');st.markdown(R.diff_html(d['before'],d['after']),unsafe_allow_html=True)
                 else: tools.form(sid,actor)
                 return
-            overlays=[];color='green'
+            highlighted_fields=[];color='green'
             if item:
                 version=st.segmented_control('Compare PDF',['Proposed','Current / source'],default='Proposed',required=True,key='compare_'+item['id'])
                 delta=P.changes(item['base'],item['candidate'])
-                overlays=[b for d in delta for b in document['bindings'].get(P.binding_key(document,d['path']),[])]
+                highlighted_fields=list({P.binding_key(document,d['path']) for d in delta}-{None})
                 if version=='Current / source':
-                    current=source if item['kind']=='import' else P.render_document(document,item['base'],False)[0];color='red'
+                    preview_record=None if item['kind']=='import' else item['base'];color='red'
                 else:
-                    try: current=P.render_document(document,item['candidate'],False)[0]
-                    except ValueError as exc: st.error(str(exc));current=source
+                    preview_record=item['candidate']
                 st.caption('Green: proposed changes' if color=='green' else 'Red: current/source locations')
                 missing=sum(not P.binding_key(document,d['path']) for d in delta)
                 if missing: st.warning(f'{missing} changed fields need a PDF location. Check them in Form view; downloads include them on added pages.')
             else:
-                try: current=P.render_document(document,record)[0]
-                except ValueError as exc: st.error(str(exc));current=source
+                preview_record=record
             if document['origin']=='generated baseline': st.caption('Preview created from the saved IEP. Imported PDFs keep their original layout.')
-            if document.get('page_labels'): st.caption(document['page_labels'][page])
             show_fields=tool=='Edit'
-            fields=[{'path':path,'rect':P.view_rectangle(document,page,b['rect'])} for path,bindings in document['bindings'].items() for b in bindings if b['page']==page]
-            png=P.page_image(current,page,overlays,color,scale=1.5)
             selected=st.session_state.get('selected_region_'+sid)
             mode='map' if tool=='Edit' and st.session_state.get('mapping_'+sid) else 'select' if tool=='Edit' else 'read'
-            result=U.region(image=base64.b64encode(png).decode(),width=pages[page]['width'],height=pages[page]['height'],page=page,
-                fields=fields,show_fields=show_fields,active_field=field,zoom=zoom,viewport_height=820,
-                selection=selected['rect'] if selected and selected['page']==page and tool=='Edit' else None,
+            with st.spinner('Preparing document pages…'):
+                try: content_id,pages=V.document_preview(source,document,preview_record,append_unmapped=not bool(item))
+                except ValueError as exc:
+                    st.error(str(exc));content_id,pages=V.document_preview(source,document)
+            result=V.viewer(pages=pages,content_id=content_id,document_key=scope,
+                initial_page=document.get('default_page',0),navigation=st.session_state.get(navigation_key),
+                show_fields=show_fields,active_field=field,zoom=zoom,viewport_height=710,
+                highlighted_fields=highlighted_fields,color=color,selection=selected if tool=='Edit' else None,
                 mode=mode,key='document_canvas_'+scope,default=None)
             if result and result['event']!=st.session_state.get('handled_canvas_event_'+sid):
                 st.session_state['handled_canvas_event_'+sid]=result['event']
                 if result.get('field') and result['field'] in O.leaf_fields(record):
                     st.session_state['pending_field_'+sid]=result['field'];navigate(sid,'Edit')
                 elif result.get('rect'): st.session_state['selected_region_'+sid]=result;st.rerun()
-            with st.expander('All pages'):
-                for pi in range(len(pages)):
-                    if st.button(f'Go to page {pi+1}',key=f'page_link_{scope}_{pi}'):
-                        st.session_state['pending_page_'+sid]=pi;st.rerun()
 
 def resources_workspace(sid,actor,section=None):
     if section is None:

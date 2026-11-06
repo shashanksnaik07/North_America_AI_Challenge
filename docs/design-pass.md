@@ -33,6 +33,15 @@ The original PDFs, review rules, AI services and integration adapters are unchan
   sizes and clear focus rings. Avoid remote font dependencies.
 * Keep PDF and controls alongside one another on wide screens. Below 1100 px,
   stack controls at full width for active tasks; View IEP keeps the PDF first.
+* Display PDF pages in a continuous scroll area with a fixed navigation toolbar:
+  first/previous/next/last, an editable page number and a total page count. The
+  current page follows scrolling. Page Up/Down and Home/End work inside the viewer.
+  Remember each document's position while changing tools, zoom or comparison
+  versions. “Show this field on PDF” explicitly jumps to its bound page.
+  Navigation runs in the browser without rerunning Streamlit. Lazy image decoding
+  and a bounded preview cache limit repeat rendering; long documents still need
+  their page images prepared on first open. Field selection, mapping and review
+  overlays work on every page, including rotated pages and continuation pages.
 * Render only the active main tab, preventing hidden connection or template
   controls from doing work and distracting from the current task.
 
