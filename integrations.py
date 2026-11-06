@@ -9,6 +9,7 @@ import uuid
 import jwt
 import requests
 import local_store as store
+import workspace_state as W
 from mock_platform import CLIENT, DEPLOYMENT, LTI, NRPS, AGS, ROLE, SCOPES, PROVIDERS, keypair
 
 BASE = 'http://127.0.0.1:8502'
@@ -31,6 +32,7 @@ def _pages(url, token, key=None, base=BASE, media='application/json'):
     return output
 
 def sync_sis(provider, base=BASE):
+    generation=W.generation()
     if provider not in PROVIDERS: raise ValueError('Choose a demo SIS provider.')
     token = requests.post(base+'/oauth/token', data={'grant_type': 'client_credentials', 'client_id': CLIENT,
                           'client_secret': 'synthetic-local-secret', 'scope': 'roster.readonly'}, timeout=15)
@@ -42,9 +44,12 @@ def sync_sis(provider, base=BASE):
     classes = {c['sourcedId'] for c in snapshot['classes']}
     if any(e['user']['sourcedId'] not in users or e['class']['sourcedId'] not in classes for e in snapshot['enrollments']):
         raise ValueError('SIS snapshot contains broken enrollment references; previous snapshot retained.')
-    store.put('sis', provider, snapshot)
+    with W.guard():
+        W.check_generation(generation)
+        store.put('sis', provider, snapshot)
     return snapshot
 
+@W.guarded
 def link_student(sid, provider, sourced_id):
     snapshot = store.get('sis', provider)
     if not snapshot: raise ValueError('Sync the provider first.')
@@ -84,6 +89,7 @@ def validate_launch(token, jwks, nonce, state, expected_state, base=BASE):
     return claims
 
 def sync_lms(sid, course_id, base=BASE):
+    generation=W.generation()
     context = student_context(sid)
     if not context or course_id not in {c['sourcedId'] for c in context['classes']}: raise ValueError('This student is not enrolled in the selected course.')
     nonce, state = secrets.token_urlsafe(24), secrets.token_urlsafe(24)
@@ -110,7 +116,10 @@ def sync_lms(sid, course_id, base=BASE):
             records.append(lms_result_record(sid, context['link']['sourced_id'], course_id,
                            claims[LTI+'context']['title'], item, result, members))
     # Replace a course snapshot, including an empty result set, so deletions cannot linger.
-    store.put('lms', sid+'|'+course_id, {'id': sid+'|'+course_id, 'student_id': sid, 'course_id': course_id,
+    with W.guard():
+        W.check_generation(generation)
+        if student_context(sid)['link'] != context['link']: raise ValueError('The student connection changed. Refresh this course again.')
+        store.put('lms', sid+'|'+course_id, {'id': sid+'|'+course_id, 'student_id': sid, 'course_id': course_id,
               'sis_id': context['link']['sourced_id'], 'records': records, 'members': members, 'synced_at': store.now(),
               'launch': {'issuer': claims['iss'], 'deployment': DEPLOYMENT, 'context': claims[LTI+'context'], 'verified': True}})
     return records
@@ -136,6 +145,7 @@ def lms_result_record(sid, sis_id, course_id, course_title, item, result, member
         'source_url':item['id'],'synthetic':True}
 
 
+@W.guarded
 def submit_report(sid, course_id, reporter, accommodation, usage, effectiveness, observation, period_start, period_end, reporter_role='Teacher'):
     context = student_context(sid)
     course = next((c for c in (context or {}).get('classes', []) if c['sourcedId'] == course_id), None)

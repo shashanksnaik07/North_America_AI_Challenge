@@ -61,7 +61,7 @@ def binding_controls(document, path, page, key):
     values = [col.number_input(label, min_value=0., max_value=float(width if index % 2 == 0 else height),
                                value=float(round(default[index], 1)), step=1., key=key+str(index)+'_'+str((coords or {}).get('event', 0)))
               for index, (col, label) in enumerate(zip(cols, ['Left', 'Top', 'Right', 'Bottom']))]
-    if st.button('Bind this PDF region to the field', key=key+'_bind'):
+    if st.button('Bind this PDF region to the field', key=key+'_bind',icon=':material/description:'):
         return attempt(P.set_binding, document, path, {'page': page, 'rect': P.view_rectangle(document, page, values, inverse=True)})
     return None
 
@@ -78,14 +78,14 @@ def show_pdf_diff(item, key):
     try:
         content_id,pages = V.document_preview(source,document,record,append_unmapped=False)
         V.continuation_notice(document)
-        V.viewer(pages=pages,content_id=content_id,document_key='review_'+item['id']+document['sha256'][:8],
+        V.viewer(pages=pages,content_id=content_id,document_key='review_'+item['id']+document['sha256'][:8]+st.session_state.get('workspace_generation','initial'),
                  redlines=redlines,mode='read',zoom=100,viewport_height=710,
                  highlighted_fields=[] if redlines else list({P.binding_key(document,d['path']) for d in delta}-{None}),
                  color='red' if version=='Current / source' else 'green',key=key+'_pdf',default=None)
         missing = [d['path'] for d in delta if not P.binding_key(document, d['path'])]
         if missing: st.caption(f'{len(missing)} changed fields have no PDF region. Review them in the form diff; approved changes to unbound source fields appear in an addendum.')
         full, _ = P.render_document(document, item['candidate'])
-        st.download_button('Download proposed original-layout PDF', full, 'proposed-iep.pdf', 'application/pdf', key=key+'_download')
+        st.download_button('Download proposed original-layout PDF', full, 'proposed-iep.pdf', 'application/pdf', key=key+'_download',icon=':material/download:')
     except ValueError as exc: st.error(str(exc))
 
 def import_controls(actor):
@@ -97,7 +97,7 @@ def import_controls(actor):
         name = st.text_input('Student name, if the document is unclear', key='import_name')
         students = core.list_students()
         target = st.selectbox('Add to', [None] + list(students), format_func=lambda s: 'A new student' if s is None else 'Existing student: '+students[s])
-    if st.button('Prepare for review',type='primary', disabled=upload is None):
+    if st.button('Prepare for review',type='primary', disabled=upload is None,icon=':material/rate_review:'):
         info = {}; candidate = core.blank_iep(name)
         with st.spinner('Reading the source and preparing a review draft...'):
             try:
@@ -133,14 +133,14 @@ def templates_workspace(actor):
     items = [t for t in items if state == 'All' or t['state'] == state]
     item = st.selectbox('Template', items, format_func=lambda t: t['title'])
     st.caption(f"{item['pages']} pages · Form date: {item['form_date']} · {item.get('form_type', '')}")
-    st.link_button('Open NASET source PDF', item['url'])
+    st.link_button('Open NASET source PDF', item['url'],icon=':material/open_in_new:')
     rows = [{'Concept': c['concept'], 'Record path': c['field'], 'Source pages': ', '.join(str(e['page']) for e in c['evidence']), 'Matched label': c['evidence'][0]['label']} for c in item['crosswalk']]
     with st.expander('Section mappings (for template designers)'):
         st.caption('Candidate mappings need visual confirmation. These reference forms do not establish current state requirements.')
         st.dataframe(rows, hide_index=True, width='stretch')
     cache = store.DATA_DIR / 'reference' / (item['id']+'.pdf')
     if not cache.exists():
-        if st.button('Download this reference template'):
+        if st.button('Download this reference template',icon=':material/download:'):
             import requests
             response = requests.get(item['url'], timeout=45); response.raise_for_status()
             if P.digest(response.content) != item['sha256']: st.error('Source changed since catalog build; refresh the catalog before using it.')
@@ -159,11 +159,11 @@ def templates_workspace(actor):
             if mapped:
                 design.update(bindings=mapped['bindings'], source_sha256=mapped['sha256'])
                 store.put('template_design', item['id'], design); notice('Reusable template location saved. It will be applied to new drafts on this exact PDF version.')
-            st.download_button('Download reusable template design', json.dumps(design, indent=2), item['id']+'.design.json', 'application/json')
+            st.download_button('Download reusable template design', json.dumps(design, indent=2), item['id']+'.design.json', 'application/json',icon=':material/download:')
         with st.expander('Start an IEP on this original template'):
             name = st.text_input('New student name')
             st.caption('Some references contain sample content. Select a blank form and inspect every page before confirmation.')
-            if st.button('Create template review draft', disabled=not name.strip()):
+            if st.button('Create template review draft', disabled=not name.strip(),icon=':material/edit_note:'):
                 candidate = core.blank_iep(name.strip())
                 design = store.get('template_design', item['id'], {'fields': []})
                 candidate['extensions'] = {f['key']: {'string': '', 'number': 0, 'boolean': None}[f['type']] for f in design['fields']}
@@ -180,19 +180,19 @@ def templates_workspace(actor):
         label = st.text_input('Display label', key='design_label')
         concept = st.selectbox('Ontology concept', list(O.CLASSES), index=list(O.CLASSES).index('Assertion'))
         kind = st.selectbox('Value type', ['string', 'number', 'boolean'])
-        if st.button('Save field definition'):
+        if st.button('Save field definition',icon=':material/crop_free:'):
             import re
             if not re.fullmatch('[a-zA-Z][a-zA-Z0-9_]{0,63}', key) or not label.strip(): st.error('Enter a valid key and label.')
             else:
                 design['fields'] = [f for f in design['fields'] if f['key'] != key] + [{'key': key, 'label': label, 'concept': concept, 'type': kind}]
                 store.put('template_design', item['id'], design); notice('Template field definition saved.')
         schema = O.template_schema(item['id'])
-        st.download_button('Download template JSON Schema', json.dumps(schema, indent=2), item['id']+'.schema.json', 'application/json')
-        st.download_button('Download source crosswalk', json.dumps(item, indent=2), item['id']+'.crosswalk.json', 'application/json')
+        st.download_button('Download template JSON Schema', json.dumps(schema, indent=2), item['id']+'.schema.json', 'application/json',icon=':material/download:')
+        st.download_button('Download source crosswalk', json.dumps(item, indent=2), item['id']+'.crosswalk.json', 'application/json',icon=':material/download:')
     with st.expander('Upper ontology and IEP specialization'):
         st.dataframe([{'Class': c, 'Parent class': parent or '(root)'} for c, parent in O.CLASSES.items()], hide_index=True, width='stretch')
-        st.download_button('Download OWL/Turtle ontology', O.turtle(), 'iep-upper-ontology.ttl', 'text/turtle')
-        st.download_button('Download canonical graph schema', json.dumps(O.graph_schema(), indent=2), 'canonical.schema.json', 'application/json')
+        st.download_button('Download OWL/Turtle ontology', O.turtle(), 'iep-upper-ontology.ttl', 'text/turtle',icon=':material/download:')
+        st.download_button('Download canonical graph schema', json.dumps(O.graph_schema(), indent=2), 'canonical.schema.json', 'application/json',icon=':material/download:')
 
 def export_current(sid, record):
     document = P.student_document(sid)

@@ -6,8 +6,10 @@ import core
 import reviews
 import workspace_ui as U
 import workspace_design as Design
+import demo_workspace
 
 st.set_page_config(page_title='IEP Bridge', page_icon='📘', layout='wide')
+demo_workspace.sync_session()
 st.markdown('<style>'+Path(__file__).with_name('ui_style.css').read_text(encoding='utf-8')+'</style>', unsafe_allow_html=True)
 if 'pending_student' in st.session_state:
     st.session_state['student']=st.session_state.pop('pending_student')
@@ -24,7 +26,7 @@ def add_student():
         with st.form('blank_student'):
             name=st.text_input('Student name')
             st.caption('Create a blank plan, then add details in the editor.')
-            if st.form_submit_button('Create student',type='primary'):
+            if st.form_submit_button('Create student',type='primary',icon=':material/add_circle:'):
                 if not name.strip(): st.error('Enter the student’s name.')
                 else:
                     sid=U.attempt(core.create_student,core.blank_iep(name.strip()))
@@ -41,7 +43,7 @@ def add_student():
 def settings():
     st.markdown('**Demonstration workspace**')
     st.caption('Students and integrations use local demo data. Reviewer names and roles are self-selected, not authenticated.')
-    if st.button('Load example students',width='stretch'):
+    if st.button('Load example students',width='stretch',icon=':material/person:'):
         for sample in sorted((core.APP_DIR/'samples').glob('*.json')): core.load_sample(sample)
         U.notice('Example students are ready. Existing plans were kept.')
     students=core.list_students()
@@ -50,7 +52,7 @@ def settings():
         with st.expander('Remove a student'):
             st.warning('This removes the student’s local record, reviews and course reports. Shared PDF files remain archived.')
             confirmed=st.checkbox('Remove '+students[sid])
-            if st.button('Remove student',disabled=not confirmed):
+            if st.button('Remove student',disabled=not confirmed,icon=':material/delete_outline:'):
                 core.delete_student(sid)
                 st.session_state.pop('student',None)
                 U.notice('Student removed.')
@@ -60,12 +62,12 @@ with st.container(horizontal=True,vertical_alignment='center'):
     with st.container(horizontal=True,horizontal_alignment='right'):
         st.markdown('<span class="status-pill">Local demo</span>',unsafe_allow_html=True)
         with st.popover('Tools & setup',icon=':material/settings:'):
-            for area in ['Templates','Connections']:
-                if st.button(area,width='stretch'):
+            for area,icon in [('Templates','description'),('Connections','hub'),('Demo & reset','restart_alt')]:
+                if st.button(area,icon=f':material/{icon}:',width='stretch'):
                     st.session_state['setup_section']=area
                     st.session_state['pending_main']='Student workspace'
                     st.rerun()
-            if st.button('Workspace settings',width='stretch'): settings()
+            if st.button('Workspace settings',width='stretch',icon=':material/settings:'): settings()
 if 'flash' in st.session_state: st.success(st.session_state.pop('flash'))
 
 students=core.list_students()
@@ -82,8 +84,8 @@ if caseload_tab.open:
         else:
             st.write('Import an existing IEP or explore an example student to get started.')
             with st.container(horizontal=True):
-                if st.button('Import an IEP',type='primary'): add_student()
-                if st.button('Explore example students'):
+                if st.button('Import an IEP',type='primary',icon=':material/arrow_forward:'): add_student()
+                if st.button('Explore example students',icon=':material/person:'):
                     for sample in sorted((core.APP_DIR/'samples').glob('*.json')): core.load_sample(sample)
                     st.rerun()
         Design.import_queue()
@@ -97,14 +99,15 @@ if student_tab.open:
             setup_student=st.session_state.get('student')
             if setup=='Connections' and students:
                 setup_student=st.selectbox('Student',list(students),format_func=students.get,key='student',width=320,persist_state='session')
-            Design.resources_workspace(setup_student,actor,setup)
+            if setup=='Demo & reset': demo_workspace.panel()
+            else: Design.resources_workspace(setup_student,actor,setup)
         elif active_import:
             st.subheader('New student import')
             item=reviews.get(active_import)
             st.caption(item['candidate'].get('student_name') or item['title'])
             st.session_state['selected_review']=active_import
             Design.review_inbox(actor,role,imports_only=True,review_id=active_import)
-            if st.button('Back to caseload'):
+            if st.button('Back to caseload',icon=':material/arrow_back:'):
                 st.session_state.pop('active_import',None)
                 st.session_state['pending_main']='My caseload';st.rerun()
         elif students:

@@ -87,7 +87,7 @@ def caseload(students):
             with st.container(border=True):
                 name,school,dates,action=st.columns([2,2,1.2,1.4],vertical_alignment='center')
                 with name:
-                    if st.button(r['student_name'],type='tertiary',key='profile_'+sid): open_student(sid,'Overview')
+                    if st.button(r['student_name'],type='tertiary',key='profile_'+sid,icon=':material/person:'): open_student(sid,'Overview')
                     st.caption('Case manager: '+(r['meta']['case_manager'] or 'Not recorded'))
                     if r.get('extensions',{}).get('mock_profile_type'): st.caption(r['extensions']['mock_profile_type'])
                 with school:
@@ -97,9 +97,9 @@ def caseload(students):
                     st.caption('Plan ends')
                     st.write(r['iep_to'] or 'Not recorded')
                 with action:
-                    if st.button('Open IEP',key='open_iep_'+sid,width='stretch'): open_student(sid)
+                    if st.button('Open IEP',key='open_iep_'+sid,width='stretch',icon=':material/arrow_forward:'): open_student(sid)
                     if counts[sid]:
-                        if st.button(f'Review {counts[sid]} draft'+('s' if counts[sid]!=1 else ''),key='review_student_'+sid,type='tertiary'): open_student(sid,tool='Review')
+                        if st.button(f'Review {counts[sid]} draft'+('s' if counts[sid]!=1 else ''),key='review_student_'+sid,type='tertiary',icon=':material/edit_note:'): open_student(sid,tool='Review')
                     else: st.caption('No pending drafts')
 
 def import_queue():
@@ -111,7 +111,7 @@ def import_queue():
         with st.container(border=True):
             st.write(r['candidate'].get('student_name') or r['title'])
             st.caption(r['title']+' · '+('Specialist review needed' if r['status']=='escalated' else 'Awaiting review'))
-            if st.button('Review import',key='open_import_'+r['id']):
+            if st.button('Review import',key='open_import_'+r['id'],icon=':material/rate_review:'):
                 st.session_state['active_import']=r['id']
                 st.session_state['pending_main']='Student workspace'
                 st.session_state.pop('setup_section',None)
@@ -137,10 +137,10 @@ def student_overview(sid,record):
             st.markdown('**Current IEP**')
             fact('Plan dates',' – '.join(x for x in [record['iep_from'],record['iep_to']] if x))
             st.caption('Recorded dates · no compliance determination')
-            if st.button('Open current IEP',type='primary',width='stretch'): navigate(sid,'Read')
+            if st.button('Open current IEP',type='primary',width='stretch',icon=':material/arrow_forward:'): navigate(sid,'Read')
             pending=R.list_reviews(sid,open_only=True)
             st.caption(f"{len(pending)} {'draft' if len(pending)==1 else 'drafts'} awaiting review")
-            if pending and st.button('Review drafts',width='stretch'): navigate(sid,'Review')
+            if pending and st.button('Review drafts',width='stretch',icon=':material/edit_note:'): navigate(sid,'Review')
 
 def student_documents(sid,actor):
     st.subheader('Student documents')
@@ -148,7 +148,7 @@ def student_documents(sid,actor):
         st.markdown('**Current IEP**')
         record=core.get_iep(sid)
         st.caption('School year '+(record['school_year'] or 'not recorded'))
-        st.download_button('Download current IEP',U.export_current(sid,record),'iep-current.pdf','application/pdf')
+        st.download_button('Download current IEP',U.export_current(sid,record),'iep-current.pdf','application/pdf',icon=':material/download:')
     section=st.segmented_control('Document library',['Supporting documents','IEP history'],default='Supporting documents',required=True,key='document_library_'+sid,persist_state='session')
     if section=='IEP history': tools.history(sid,actor)
     else: resources_workspace(sid,actor,'Supporting files')
@@ -167,7 +167,7 @@ def overview(sid, record):
     pending=R.list_reviews(sid,open_only=True)
     if pending:
         st.info(f"{len(pending)} {'change needs' if len(pending)==1 else 'changes need'} review.")
-        if st.button('Review pending changes',type='primary',width='stretch'): navigate(sid,'Review')
+        if st.button('Review pending changes',type='primary',width='stretch',icon=':material/rate_review:'): navigate(sid,'Review')
     else: st.caption('No changes waiting for review.')
     fact('Plan dates', ' – '.join(x for x in [record['iep_from'],record['iep_to']] if x))
     fact('Case manager',record['meta']['case_manager'])
@@ -180,9 +180,9 @@ def overview(sid, record):
         with st.expander('Case and template provenance'):
             st.write(metadata['case_label']+' · '+metadata['state'])
             st.caption('Practice record built from the listed sources. The original NASET layout contains the plan; linked continuation pages hold overflow and additional details.')
-            st.link_button('NASET reference form',metadata['naset']['url'])
-            st.link_button('Hong Kong example',metadata['edb']['url'])
-            st.download_button('Download provenance',json.dumps(metadata,indent=2),sid+'-provenance.json','application/json')
+            st.link_button('NASET reference form',metadata['naset']['url'],icon=':material/open_in_new:')
+            st.link_button('Hong Kong example',metadata['edb']['url'],icon=':material/open_in_new:')
+            st.download_button('Download provenance',json.dumps(metadata,indent=2),sid+'-provenance.json','application/json',icon=':material/download:')
 
 def edit_panel(sid,record,actor):
     st.subheader('Propose an edit')
@@ -198,12 +198,12 @@ def edit_panel(sid,record,actor):
     value=U.typed_value('Proposed wording',fields[field],draft_key)
     changed=value!=fields[field]
     if changed: st.caption('Unsaved draft · stays here while you switch tools.')
-    if st.button('Save for review',type='primary',disabled=not changed,width='stretch'):
+    if st.button('Save for review',type='primary',disabled=not changed,width='stretch',icon=':material/save:'):
         candidate=copy.deepcopy(record);S.set_path(candidate,field,value)
         submit(sid,candidate,'Edit: '+label(field),actor)
     with st.expander('Add a goal, service or team member'):
         st.caption('Use the form editor to add or remove rows.')
-        if st.button('Open form editor',width='stretch'):
+        if st.button('Open form editor',width='stretch',icon=':material/edit_note:'):
             st.session_state['pending_view_'+sid]='Form';st.rerun()
     with st.expander('PDF layout & advanced options'):
         st.caption('Only needed when a field is missing or appears in the wrong place.')
@@ -212,7 +212,7 @@ def edit_panel(sid,record,actor):
         document=P.ensure_document(sid,record)
         if selected:
             st.caption(f"Selected area on page {selected['page']+1}.")
-            if st.button('Use this area for the field'):
+            if st.button('Use this area for the field',icon=':material/crop_free:'):
                 mapped=U.attempt(P.set_binding,document,field,{'page':selected['page'],'rect':P.view_rectangle(document,selected['page'],selected['rect'],inverse=True)})
                 if mapped: submit(sid,record,'Position field: '+label(field),actor,mapped)
         with st.expander('Enter exact coordinates'):
@@ -220,18 +220,18 @@ def edit_panel(sid,record,actor):
             page=st.number_input('Page for field',1,len(pages),1,key='bind_page_'+sid)-1
             old=next((b['rect'] for b in document['bindings'].get(field,[]) if b['page']==page),[30.,60.,300.,120.])
             coords=[st.number_input(n,value=float(old[i]),key=f'coord_{sid}_{field}_{page}_{i}') for i,n in enumerate(['Left','Top','Right','Bottom'])]
-            if st.button('Save field location for review'):
+            if st.button('Save field location for review',icon=':material/crop_free:'):
                 mapped=U.attempt(P.set_binding,document,field,{'page':page,'rect':coords})
                 if mapped: submit(sid,record,'Position field: '+label(field),actor,mapped)
         with st.expander('Replace the source PDF'):
             upload=st.file_uploader('Source PDF',type=['pdf'],key='attach_'+sid)
-            if st.button('Review replacement PDF',disabled=upload is None):
+            if st.button('Review replacement PDF',disabled=upload is None,icon=':material/description:'):
                 mapped=U.attempt(P.archive_source,upload.getvalue(),record,upload.name)
                 if mapped: submit(sid,record,'Replace source PDF',actor,mapped)
         with st.expander('Edit structured data'):
             st.caption('For template administrators. Ordinary edits belong in the fields above.')
             raw=st.text_area('IEP JSON',json.dumps(record,indent=2),height=200,key='advanced_'+sid)
-            if st.button('Validate and review data'):
+            if st.button('Validate and review data',icon=':material/rate_review:'):
                 try:
                     import jsonschema
                     candidate=json.loads(raw)
@@ -257,6 +257,7 @@ def evidence_cards(items):
         st.caption(' · '.join(str(v) for v in details if v))
 
 def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imports=False,imports_only=False,review_id=None):
+    generation=st.session_state.get('workspace_generation')
     st.subheader('Review changes')
     include_closed=st.checkbox('Show completed reviews',key=f'closed_{sid}')
     items=R.list_reviews(None if include_imports else sid,open_only=not include_closed)
@@ -289,7 +290,7 @@ def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imp
             st.markdown(R.diff_html(selected['before'],selected['after']),unsafe_allow_html=True)
             document=item.get('document') or {}
             bindings=document.get('bindings',{}).get(P.binding_key(document,selected['path']),[]) if document else []
-            if sid and bindings and st.button('Show this field on PDF',key=scope+'_locate'):
+            if sid and bindings and st.button('Show this field on PDF',key=scope+'_locate',icon=':material/description:'):
                 st.session_state['pending_page_'+sid]=bindings[0]['page']
                 st.session_state['pending_view_'+sid]='PDF'
                 st.rerun()
@@ -302,7 +303,7 @@ def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imp
                 fields=U.field_choices(item['candidate'])
                 field=st.selectbox('Field to correct',list(fields),format_func=label,key=scope+'_field')
                 value=U.typed_value('Revised wording',fields[field],scope+'_value_'+field)
-                if st.button('Save correction',key=scope+'_correct'):
+                if st.button('Save correction',key=scope+'_correct',icon=':material/save:'):
                     candidate=copy.deepcopy(item['candidate']);S.set_path(candidate,field,value)
                     try: R.update_candidate(rid,candidate,actor,item['revision']);U.notice('Correction saved. Review the updated draft.')
                     except Exception as exc: st.error(str(exc))
@@ -314,7 +315,7 @@ def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imp
                     if mapped:
                         R.update_candidate(rid,item['candidate'],actor,item['revision'],mapped);U.notice('PDF location saved.')
         st.button('Continue to decision',type='primary',width='stretch',key=scope+'_next',
-                  on_click=lambda: st.session_state.update({'review_step_'+scope:'Decide'}))
+                  on_click=lambda: st.session_state.update({'review_step_'+scope:'Decide'}),icon=':material/arrow_forward:')
     else:
         if item['status'] not in R.OPEN:
             st.success('This review is complete. The activity log records the decision.')
@@ -330,23 +331,23 @@ def review_inbox(actor='',role='Case manager',sid=None,compact=False,include_imp
             if not reviewer.strip(): st.caption('Enter your name to record a decision.')
             elif not can_decide: st.caption('This decision needs the assigned reviewer and required role, or an Administrator.')
             elif not confirmed: st.caption('Confirm your review to enable approval.')
-            if st.button('Approve import' if item['kind']=='import' else 'Approve changes',type='primary',disabled=not confirmed or not reviewer.strip() or not can_decide,width='stretch',key=scope+'_approve'):
+            if st.button('Approve import' if item['kind']=='import' else 'Approve changes',type='primary',disabled=not confirmed or not reviewer.strip() or not can_decide,width='stretch',key=scope+'_approve',icon=':material/check_circle:'):
                 try:
-                    student=R.decide(rid,'approved',reviewer,reviewer_role,confirmed,note,item['revision'])
+                    student=R.decide(rid,'approved',reviewer,reviewer_role,confirmed,note,item['revision'],expected_generation=generation)
                     if student:
                         st.session_state['pending_student']=student
                         st.session_state['pending_student_section']='IEP'
                     st.session_state.pop('active_import',None)
                     U.notice('Approved. The updated IEP and previous version have been saved.')
                 except Exception as exc: st.error(str(exc))
-            if st.button('Reject this draft',disabled=not reviewer.strip() or not can_decide,width='stretch',key=scope+'_reject'):
-                try: R.decide(rid,'rejected',reviewer,reviewer_role,note=note,revision=item['revision']);U.notice('Draft rejected. The student’s plan is unchanged.')
+            if st.button('Reject this draft',disabled=not reviewer.strip() or not can_decide,width='stretch',key=scope+'_reject',icon=':material/cancel:'):
+                try: R.decide(rid,'rejected',reviewer,reviewer_role,note=note,revision=item['revision'],expected_generation=generation);U.notice('Draft rejected. The student’s plan is unchanged.')
                 except Exception as exc: st.error(str(exc))
             with st.expander('Request another reviewer'):
                 assignee=st.text_input('Reviewer to assign',key=scope+'_assignee')
                 required=st.selectbox('Role needed',R.ROLES,index=1,key=scope+'_role')
                 reason=st.text_area('What needs their attention?',key=scope+'_reason')
-                if st.button('Assign review',key=scope+'_escalate'):
+                if st.button('Assign review',key=scope+'_escalate',icon=':material/person_add:'):
                     try: R.escalate(rid,reviewer,reason,assignee,required);U.notice('Review assigned in the local inbox.')
                     except Exception as exc: st.error(str(exc))
     if not compact and item.get('document'):
@@ -389,7 +390,7 @@ def acrobat_workspace(sid,record,actor,role):
                 st.info('This source has no readable PDF. Compare the extracted information in Review.')
                 st.text(item.get('source_text') or 'No text could be extracted. Review the source file before approving.')
                 return
-            source=P.source_bytes(document);scope=sid+document['sha256'][:8]
+            source=P.source_bytes(document);scope=sid+document['sha256'][:8]+st.session_state.get('workspace_generation','initial')
             navigation_key='pdf_navigation_'+scope
             if 'pending_page_'+sid in st.session_state:
                 st.session_state[navigation_key]={'page':st.session_state.pop('pending_page_'+sid),'token':uuid.uuid4().hex}
@@ -398,9 +399,9 @@ def acrobat_workspace(sid,record,actor,role):
                 if view=='PDF':
                     zoom=st.selectbox('Zoom',[100,125,150,200],format_func=lambda x:'Fit width' if x==100 else f'{x}%',key='zoom_'+sid,width=125,persist_state='session')
                 with st.popover('Download',icon=':material/download:'):
-                    try: st.download_button('Proposed IEP' if item else 'Current IEP',P.render_document(document,item['candidate'] if item else record)[0],'iep-proposed.pdf' if item else 'iep.pdf','application/pdf',width='stretch')
+                    try: st.download_button('Proposed IEP' if item else 'Current IEP',P.render_document(document,item['candidate'] if item else record)[0],'iep-proposed.pdf' if item else 'iep.pdf','application/pdf',width='stretch',icon=':material/download:')
                     except ValueError as exc: st.error(str(exc))
-                    st.download_button('Unchanged original',source,document['filename'],'application/pdf',width='stretch')
+                    st.download_button('Unchanged original',P.source_bytes(document.get('original_source',document)),document['filename'],'application/pdf',width='stretch',icon=':material/download:')
             if view=='Form':
                 if tool=='Review' and item:
                     st.subheader('Proposed changes')
@@ -461,7 +462,7 @@ def resources_workspace(sid,actor,section=None):
         st.caption('Add evaluations, progress notes or other context for questions and suggested changes.')
         with st.form('supporting_files_'+sid):
             upload=st.file_uploader('Choose a PDF or text file',type=['pdf','txt'])
-            if st.form_submit_button('Add supporting file',type='primary'):
+            if st.form_submit_button('Add supporting file',type='primary',icon=':material/attach_file:'):
                 if upload is None: st.error('Choose a file first.')
                 else:
                     text=U.attempt(core.extract_text,upload.name,upload.getvalue())
@@ -479,18 +480,18 @@ def connections(sid,actor):
     with st.container(border=True):
         st.markdown('**1. Choose a student information system**')
         provider=st.selectbox('School system',list(I.PROVIDERS),format_func=I.PROVIDERS.get,key='provider_'+sid)
-        if st.button('Refresh roster',type='primary'):
+        if st.button('Refresh roster',type='primary',icon=':material/sync:'):
             if U.attempt(I.sync_sis,provider): st.success('Roster refreshed. Match the student below.')
         snapshot=store.get('sis',provider)
         if snapshot:
             st.markdown('**2. Match this student**')
             students=[u for u in snapshot['users'] if u['role']=='student' and u['status']=='active']
             chosen=st.selectbox('Roster student',students,format_func=lambda u:f"{u['givenName']} {u['familyName']} · {u['sourcedId']}")
-            if st.button('Connect student'):
+            if st.button('Connect student',icon=':material/link:'):
                 try: I.link_student(sid,provider,chosen['sourcedId']);U.notice('Student connected. Open Course reports to view course information.')
                 except Exception as exc: st.error(str(exc))
             with st.expander('Technical details'): st.json(snapshot)
-    if context and st.button('Review school and grade updates'):
+    if context and st.button('Review school and grade updates',icon=':material/rate_review:'):
         candidate=core.get_iep(sid);candidate['grade']=next(iter(context['user'].get('grades',[])),candidate['grade'])
         schools={o['sourcedId']:o['name'] for o in context['orgs']}
         if context['classes']: candidate['meta']['school']=schools.get(context['classes'][0]['school']['sourcedId'],'')
@@ -498,7 +499,7 @@ def connections(sid,actor):
         if rid: navigate(sid,'Review',rid)
     with st.expander('About these demo connections'):
         st.write('SIS rosters use a OneRoster 1.2 subset. LTI 1.3 launches, NRPS membership and AGS results provide permitted course context. They do not expose all LMS content. Course reports are entered in this app.')
-        st.download_button('Export canonical IEP data',json.dumps(O.canonical(core.get_iep(sid),sid,evidence=I.evidence(sid)),indent=2),'iep-canonical.json','application/json')
+        st.download_button('Export canonical IEP data',json.dumps(O.canonical(core.get_iep(sid),sid,evidence=I.evidence(sid)),indent=2),'iep-canonical.json','application/json',icon=':material/download:')
 
 def course_reports(sid,actor):
     st.subheader('Grades & course feedback')
@@ -506,7 +507,7 @@ def course_reports(sid,actor):
     context=I.student_context(sid)
     if not context or not context['classes']:
         st.info('Connect a school roster to choose the student’s courses.')
-        if st.button('Set up a connection',type='primary'):
+        if st.button('Set up a connection',type='primary',icon=':material/link:'):
             st.session_state['setup_section']='Connections';st.rerun()
         return
     items=I.evidence(sid)
@@ -529,7 +530,7 @@ def course_reports(sid,actor):
         with st.expander('Student, family & other reports',expanded=True):evidence_cards(direct)
     aggregation=I.aggregate_reports(sid)
     if items:
-        if st.button('Use these reports to draft an update',type='primary'):navigate(sid,'Modifications')
+        if st.button('Use these reports to draft an update',type='primary',icon=':material/edit_note:'):navigate(sid,'Modifications')
     if aggregation:
       with st.expander('Accommodation report summary'):
         for group in aggregation:
@@ -549,14 +550,14 @@ def course_reports(sid,actor):
             start=st.date_input('Reporting period starts',value=dt.date.today().replace(day=1))
             end=st.date_input('Reporting period ends',value=dt.date.today())
             observation=st.text_area('Examples and observations',placeholder='Describe the task, how the accommodation was used, and what you noticed.')
-            if st.form_submit_button('Save report',type='primary'):
+            if st.form_submit_button('Save report',type='primary',icon=':material/save:'):
                 if U.attempt(I.submit_report,sid,course['sourcedId'],reporter,accommodation,usage,effectiveness,observation,start,end,reporter_role): U.notice('Report saved. It is now available to Suggested modifications.')
     with st.expander('Refresh course information'):
         course=st.selectbox('Course to refresh',context['classes'],format_func=lambda c:c['title'])
         st.caption('Retrieves grades, assignment comments and course membership shared by the connected LMS.')
-        if st.button('Refresh course'):
+        if st.button('Refresh course',icon=':material/sync:'):
             records=U.attempt(I.sync_lms,sid,course['sourcedId'])
             if records is not None: U.notice(f'Course refreshed. {len(records)} results available.')
     with st.expander(f'All reports & course evidence ({len(items)})'):
         evidence_cards(items)
-        st.download_button('Download reports',json.dumps(items,indent=2),'course-evidence.json','application/json')
+        st.download_button('Download reports',json.dumps(items,indent=2),'course-evidence.json','application/json',icon=':material/download:')

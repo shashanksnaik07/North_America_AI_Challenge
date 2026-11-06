@@ -10,6 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from xml.sax.saxutils import escape
 import ontology
+import workspace_state as W
 from local_store import DATA_DIR, atomic_json
 
 def digest(data): return hashlib.sha256(data).hexdigest()
@@ -38,6 +39,7 @@ def ensure_form_tree(writer):
         form=DictionaryObject();writer._root_object[NameObject('/AcroForm')]=writer._add_object(form)
     form[NameObject('/Fields')]=ArrayObject(roots)
 
+@W.guarded
 def source_bytes(document):
     path = (DATA_DIR / document['source']).resolve()
     if not path.is_relative_to(DATA_DIR.resolve()): raise ValueError('Invalid document location.')
@@ -82,6 +84,7 @@ def bind_text(data, record):
                 if matches: bindings[path] = matches
     return bindings
 
+@W.guarded
 def archive_source(data, record, filename, template_id='custom', origin='uploaded'):
     inspect_pdf(data)
     sha = digest(data)
@@ -97,6 +100,7 @@ def archive_source(data, record, filename, template_id='custom', origin='uploade
             'template_id': template_id, 'origin': origin, 'baseline': copy.deepcopy(record),
             'bindings': bindings}
 
+@W.guarded
 def student_document(sid):
     path = DATA_DIR / 'students' / sid / 'document.json'
     return json.loads(path.read_text(encoding='utf-8')) if path.exists() else None
@@ -104,6 +108,7 @@ def student_document(sid):
 def save_document(sid, document):
     atomic_json(DATA_DIR / 'students' / sid / 'document.json', document)
 
+@W.guarded
 def ensure_document(sid, record):
     document = student_document(sid)
     if document: return document
@@ -235,6 +240,81 @@ def render_document(document, record, append_unmapped=True):
             SimpleDocTemplate(buffer).build(story)
             with fitz.open(stream=buffer.getvalue(), filetype='pdf') as appendix: doc.insert_pdf(appendix)
         return doc.tobytes(garbage=3, deflate=True), unmapped
+
+
+def prepare_draft_document(document, base, candidate):
+    """Give new/overflow fields real review regions before a draft is submitted.
+
+    Existing source pages stay in their original layout. Additional detail pages
+    carry both current and proposed text, so additions are reviewable on the PDF.
+    """
+    import iep_schema as S
+    from native_templates import display_value, fits
+    from pypdf import PdfReader, PdfWriter
+    def value(record, path):
+        try: return S.get_path(record, path)
+        except (KeyError, IndexError, TypeError): return None
+    extra=[]
+    with fitz.open(stream=source_bytes(document), filetype='pdf') as source:
+        original_count=len(source)
+        for change in changes(base, candidate):
+            key=binding_key(document, change['path'])
+            if key:
+                needs_space=False
+                for binding in document['bindings'][key]:
+                    page=source[binding['page']];rect=fitz.Rect(binding['rect'])
+                    text=binding_text(page,rect,value(candidate,key),binding)
+                    if not fits(rect,text,size=6): needs_space=True
+                    if binding.get('widget'):
+                        widget=next((w for w in page.widgets() or [] if w.field_name==binding['widget']),None)
+                        if widget and not widget.field_flags & fitz.PDF_TX_FIELD_IS_MULTILINE:
+                            if '\n' in text or fitz.get_text_length(text,fontsize=6)>rect.width-4: needs_space=True
+                if needs_space and key not in extra: extra.append(key)
+            else:
+                parts=change['path'].split('.')
+                key='.'.join(parts[:2]) if parts[0]=='goals' and len(parts)>2 else change['path']
+                if parts[0]=='services' and len(parts)>4 and parts[2]=='rows': key='.'.join(parts[:4])
+                if key not in extra: extra.append(key)
+    if not extra: return document
+    prepared=copy.deepcopy(document)
+    current,_=render_document(document,base,append_unmapped=False)
+    prepared['baseline']=copy.deepcopy(base)
+    prepared.setdefault('original_source',{'source':document['source'],'sha256':document['sha256']})
+    labels=list(document.get('page_labels',[]))
+    labels += [f'Page {i+1}' for i in range(len(labels),original_count)]
+    with fitz.open() as appendix:
+        page=None; y=0
+        for key in extra:
+            old=display_value(value(base,key)) if value(base,key) is not None else ''
+            new=display_value(value(candidate,key)) if value(candidate,key) is not None else ''
+            height=44
+            while height<=600 and not all(fits(fitz.Rect(46,0,566,height),text,size=9) for text in (old,new)):
+                height+=16
+            if height>600: raise ValueError('This field exceeds a detail page. Shorten the wording before review: '+S.label_for(key))
+            if page is None or y+height>740:
+                page=appendix.new_page(width=612,height=792);y=100
+                page.insert_text((40,40),'IEP Bridge | Additional plan details',fontsize=13)
+                page.insert_text((40,60),base['student_name'],fontsize=10)
+                page.insert_text((40,775),'App-added page | '+str(original_count+len(appendix)),fontsize=8)
+                labels.append('Additional plan details / draft fields')
+            label=S.label_for(key).replace('\u2013','/')
+            page.insert_text((42,y-8),label[:105],fontsize=9)
+            area=fitz.Rect(45,y,568,y+height)
+            page.draw_rect(area+(-3,-3,3,3),color=(.75,.78,.8),width=.5)
+            _put_text(page,area,old)
+            page_number=original_count+len(appendix)-1
+            for binding in prepared['bindings'].get(key,[]): binding['continuation_page']=page_number+1
+            prepared['bindings'].setdefault(key,[]).append({'page':page_number,'rect':list(area),'confirmed':True,'format':'labelled'})
+            y+=height+36
+        writer=PdfWriter();writer.append(PdfReader(io.BytesIO(current)),import_outline=False)
+        writer.append(PdfReader(io.BytesIO(appendix.tobytes())),import_outline=False)
+        ensure_form_tree(writer);buffer=io.BytesIO();writer.write(buffer)
+    data=buffer.getvalue();sha=digest(data)
+    target=DATA_DIR/'originals'/(sha+'.pdf');target.parent.mkdir(parents=True,exist_ok=True)
+    if not target.exists(): target.write_bytes(data)
+    prepared.update(source=str(target.relative_to(DATA_DIR)),sha256=sha,page_labels=labels)
+    prepared.setdefault('source_page_count',original_count)
+    return prepared
 
 def page_image(data, page_number, overlays=(), color='green', scale=1.3):
     with fitz.open(stream=data, filetype='pdf') as doc:

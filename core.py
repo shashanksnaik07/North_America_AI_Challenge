@@ -26,6 +26,7 @@ import ollama
 from pypdf import PdfReader
 
 import iep_schema as S
+import workspace_state as W
 
 # ---------------------------------------------------------------------------
 # Settings - change these to match the models you pulled with Ollama.
@@ -78,9 +79,10 @@ def _chat_json(system: str, user: str, ctx: int = 16384) -> dict:
     raw = _chat(system, user, json_mode=True, ctx=ctx)
     try:
         data = json.loads(raw)
-        return data if isinstance(data, dict) else {}
-    except json.JSONDecodeError:
-        return {}
+        if not isinstance(data, dict): raise ValueError('The model returned an invalid response. Try drafting again.')
+        return data
+    except json.JSONDecodeError as exc:
+        raise ValueError('The model returned unreadable JSON. Try drafting again; no changes were saved.') from exc
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +92,7 @@ def _folder(sid: str) -> Path:
     return STUDENTS_DIR / sid
 
 
+@W.guarded
 def list_students() -> dict[str, str]:
     """Returns {student_id: student_name}, sorted by name."""
     found = {}
@@ -98,10 +101,12 @@ def list_students() -> dict[str, str]:
     return dict(sorted(found.items(), key=lambda kv: kv[1].lower()))
 
 
+@W.guarded
 def get_iep(sid: str) -> dict:
     return S.normalize(json.loads((_folder(sid) / "iep.json").read_text(encoding="utf-8")))
 
 
+@W.guarded
 def create_student(iep: dict) -> str:
     iep = S.normalize(iep)
     if not iep["student_name"].strip():
@@ -116,6 +121,7 @@ def create_student(iep: dict) -> str:
     return sid
 
 
+@W.guarded
 def save_iep(sid: str, iep: dict, note: str = "", force_version: bool = False) -> bool:
     """Save a new version. The old one goes to the versions folder."""
     iep = S.normalize(iep)
@@ -136,6 +142,7 @@ def save_iep(sid: str, iep: dict, note: str = "", force_version: bool = False) -
     return True
 
 
+@W.guarded
 def list_versions(sid: str) -> list[dict]:
     vdir = _folder(sid) / "versions"
     if not vdir.exists():
@@ -153,6 +160,7 @@ def list_versions(sid: str) -> list[dict]:
     return out
 
 
+@W.guarded
 def delete_student(sid: str) -> None:
     import local_store
     # Remove linked evidence and proposals, so reusing a student ID cannot revive them.
@@ -308,13 +316,13 @@ def add_supporting_doc(sid: str, filename: str, text: str) -> int:
     chunks = chunk_text(text)
     if not chunks:
         raise ValueError("No text found. Is this a scanned PDF? (needs OCR)")
+    generation = W.generation()
     embeddings = _embed(chunks)
-    _col.delete(where={"$and": [{"student_id": sid}, {"source": filename}]})
-    _col.add(
-        ids=[f"{sid}-{uuid.uuid4().hex}" for _ in chunks],
-        documents=chunks, embeddings=embeddings,
-        metadatas=[{"student_id": sid, "source": filename, "chunk": i} for i in range(len(chunks))],
-    )
+    with W.guard():
+        W.check_generation(generation)
+        _col.delete(where={"$and": [{"student_id": sid}, {"source": filename}]})
+        _col.add(ids=[f"{sid}-{uuid.uuid4().hex}" for _ in chunks], documents=chunks, embeddings=embeddings,
+                 metadatas=[{"student_id": sid, "source": filename, "chunk": i} for i in range(len(chunks))])
     return len(chunks)
 
 
@@ -418,51 +426,59 @@ CATEGORY_KEYS = [k for k, _ in S.SERVICE_CATEGORIES]
 
 
 def _make_change(iep: dict, field: str, new_value: str, reason: str, source: str) -> dict | None:
+    import reviews
     try:
         current = S.get_path(iep, field)
     except (KeyError, IndexError, TypeError):
         return None
     if isinstance(current, list):
         current = "\n".join(str(x) for x in current)
-    if not isinstance(current, str) or not str(new_value).strip():
+    if not isinstance(current, str) or not isinstance(new_value, str) or not new_value.strip() or current.strip()==new_value.strip():
         return None
     return {"action": "change", "field": field, "section": S.label_for(field),
             "current_text": current or "(empty)", "suggested_text": str(new_value).strip(),
-            "reason": reason, "source": source}
+            "reason": reason, "source": source, '_base_hash':reviews.fingerprint(iep)}
 
 
 def _make_service(iep: dict, category: str, row: dict, reason: str, source: str) -> dict | None:
-    if category not in CATEGORY_KEYS or not str(row.get("service", "")).strip():
+    import reviews
+    if category not in CATEGORY_KEYS or not isinstance(row.get('service'),str) or not row['service'].strip():
         return None
     full = S.empty_service()
-    full.update({k: str(v) for k, v in row.items() if k in full})
+    full.update({k: str(v).strip() for k, v in row.items() if k in full and isinstance(v,(str,int,float)) and not isinstance(v,bool)})
     full["begin"] = full["begin"] or iep["iep_from"]
     full["end"] = full["end"] or iep["iep_to"]
     return {"action": "add_service", "category": category,
             "section": f"Add to {dict(S.SERVICE_CATEGORIES)[category]}",
             "current_text": "(new row)", "suggested_text": full["service"], "payload": full,
-            "reason": reason, "source": source}
+            "reason": reason, "source": source, '_base_hash':reviews.fingerprint(iep)}
 
 
 def _make_goal(iep: dict, g: dict, reason: str, source: str) -> dict | None:
-    if not str(g.get("goal", "")).strip():
+    import reviews
+    if not isinstance(g.get('goal'),str) or not g['goal'].strip():
         return None
     goal = S.empty_goal()
     goal.update({k: g[k] for k in ("area", "present_level", "goal") if isinstance(g.get(k), str)})
-    goal["evaluation"] = [e for e in g.get("evaluation", []) if e in S.EVALUATION_TYPES] or ["Data Collection"]
+    evaluation=g.get('evaluation') if isinstance(g.get('evaluation'),list) else []
+    goal["evaluation"] = [e for e in evaluation if e in S.EVALUATION_TYPES] or ["Data Collection"]
     goal["mastery_date"] = iep["iep_to"]
-    bms = [b for b in g.get("benchmarks", []) if isinstance(b, str) and b.strip()]
+    benchmarks=g.get('benchmarks') if isinstance(g.get('benchmarks'),list) else []
+    bms = [b for b in benchmarks if isinstance(b, str) and b.strip()]
     goal["benchmarks"] = [{"text": b, "date": ""} for b in bms] or goal["benchmarks"]
     return {"action": "add_goal", "section": f"New Annual Goal: {goal['area']}",
             "current_text": "(new goal)", "suggested_text": goal["goal"], "payload": goal,
-            "reason": reason, "source": source}
+            "reason": reason, "source": source, '_base_hash':reviews.fingerprint(iep)}
 
 
 def suggest_updates(sid: str, teacher_note: str) -> list[dict]:
     """The AI only SUGGESTS. Nothing changes unless the teacher approves."""
     iep = get_iep(sid)
-    fields = "\n".join(f"{path}: {value}" for path, value in S.text_fields(iep)
-                       if not path.startswith(("meta", "dob", "school_year", "lre.age_group")))
+    import drafting
+    basis=drafting.basis(sid,iep)
+    allowed_fields={path:value for path,value in S.text_fields(iep)
+                    if not path.startswith(('meta','dob','school_year','lre.age_group','extensions','student_name'))}
+    fields = "\n".join(f"{path}: {value}" for path,value in allowed_fields.items())
     try:
         refs = recommend_accommodations(sid, extra_text=teacher_note, k=6)
     except Exception:  # noqa: BLE001 - the dataset is optional
@@ -509,8 +525,10 @@ Use "supplementary_aids" for classroom accommodations and "assessment_accommodat
 Return: {{"suggestions": [ ... ]}}""",
     )
 
+    raw=data.get('suggestions')
+    if not isinstance(raw,list): raise ValueError('The model did not return a list of draft changes. Try again; no changes were saved.')
     out = []
-    for s in data.get("suggestions", []):
+    for s in raw[:4]:
         if not isinstance(s, dict):
             continue
         reason, source = str(s.get("reason", "")), str(s.get("source", "teacher note"))
@@ -519,7 +537,8 @@ Return: {{"suggestions": [ ... ]}}""",
             source = f"dataset: {refs[int(a.group(1)) - 1].get('name', '')}"
         action = s.get("action")
         if action == "change":
-            item = _make_change(iep, str(s.get("field", "")), s.get("new_value", ""), reason, source)
+            field=str(s.get('field',''))
+            item = _make_change(iep, field, s.get("new_value", ""), reason, source) if field in allowed_fields else None
         elif action == "add_service":
             item = _make_service(iep, s.get("category", ""), s, reason, source)
         elif action == "add_goal":
@@ -531,27 +550,14 @@ Return: {{"suggestions": [ ... ]}}""",
             item['omitted_evidence_ids'] = omitted_evidence
             item['teacher_note'] = teacher_note
             out.append(item)
-    return out
+    if raw and not out: raise ValueError('The proposed changes were invalid or repeated current wording. Refine the observation and draft again.')
+    return drafting.stamp(out,basis)
 
 
 def apply_suggestion(sid: str, s: dict, teacher: str) -> str:
     """Stage a suggestion for explicit human review; leave the active IEP unchanged."""
-    iep = get_iep(sid)
-    text = s["suggested_text"].strip()
-    if s["action"] == "change":
-        S.set_path(iep, s["field"], text)
-    elif s["action"] == "add_service":
-        row = {**s["payload"], "service": text}
-        iep["services"][s["category"]]["rows"].append(row)
-        iep["services"][s["category"]]["needed"] = True
-    elif s["action"] == "add_goal":
-        iep["goals"].append({**s["payload"], "goal": text})
-    else:
-        raise ValueError(f"Unknown action {s['action']}")
-    import reviews
-    review_id = reviews.stage_change(sid, iep, s['section'], teacher, evidence=s.get('evidence', []) +
-                                     [{'source': 'teacher note', 'text': s.get('teacher_note', ''), 'omitted_evidence_ids': s.get('omitted_evidence_ids', [])}])
-    return f"Submitted to Review: {s['section']} (review {review_id[:8]})."
+    import drafting
+    return drafting.submit(sid,[s],teacher)
 
 
 # ---------------------------------------------------------------------------
@@ -646,9 +652,11 @@ def accommodation_to_suggestion(sid: str, a: dict) -> dict:
     reason = (f"Recommended in the accommodations dataset for "
               f"{', '.join(a.get('matched_on', [])) or 'this profile'} "
               f"(evidence: {a.get('evidence_level', 'unknown')}). {a.get('description', '')}")
-    return _make_service(iep, category, {"service": a.get("name", ""), "frequency": "Daily",
+    item=_make_service(iep, category, {"service": a.get("name", ""), "frequency": "Daily",
                                          "amount": "As needed", "location": "All classrooms"},
                          reason, f"dataset: {a.get('name', '')}")
+    import drafting
+    return drafting.stamp([item],drafting.basis(sid,iep))[0]
 
 
 # ---------------------------------------------------------------------------
@@ -658,12 +666,14 @@ def _read_log() -> list[dict]:
     return json.loads(LOG_FILE.read_text(encoding="utf-8")) if LOG_FILE.exists() else []
 
 
+@W.guarded
 def log_decision(sid: str, suggestion: dict, decision: str, teacher: str) -> None:
     log = _read_log()
     entry = {k: v for k, v in suggestion.items() if k != "payload"}
     log.append({"time": _now(), "student_id": sid, "teacher": teacher or "unknown",
                 "decision": decision, **entry})
-    LOG_FILE.write_text(json.dumps(log, indent=2), encoding="utf-8")
+    from local_store import atomic_json
+    atomic_json(LOG_FILE,log)
 
 
 def get_log(sid: str) -> list[dict]:

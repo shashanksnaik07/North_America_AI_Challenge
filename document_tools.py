@@ -10,6 +10,7 @@ import export_pdf
 import iep_schema as S
 import workspace_ui as U
 import reviews
+import drafting
 
 
 def run_safely(fn, *args, **kwargs):
@@ -73,7 +74,7 @@ def modifications(sid, teacher=''):
     pending=reviews.list_reviews(sid,open_only=True)
     if pending:
         st.info(f"{len(pending)} saved {'draft is' if len(pending)==1 else 'drafts are'} ready to compare.")
-        if st.button('Review saved drafts',width='stretch'): D.navigate(sid,'Review')
+        if st.button('Review saved drafts',width='stretch',icon=':material/edit_note:'): D.navigate(sid,'Review')
     context_key='modification_focus_'+sid
     focus=st.text_area('Question or observation',key=context_key,persist_state='session',height=120,
                        placeholder='For example: what should change when a support helps in one course but is unavailable in another?')
@@ -83,15 +84,19 @@ def modifications(sid, teacher=''):
         if evidence: D.evidence_cards(evidence)
         else: st.caption('Add classroom reports in Progress & reports, or documents in Documents.')
     left,right=st.columns(2)
-    if left.button('Discuss options',disabled=not focus.strip(),width='stretch'):
+    if left.button('Discuss options',disabled=not focus.strip(),width='stretch',icon=':material/forum:'):
         with st.spinner('Reading the plan and supporting context...'):
             result=run_safely(core.answer,sid,focus.strip())
         if result:
             st.session_state.setdefault('modification_discussion_'+sid,[]).insert(0,(focus,*result))
-    if right.button('Draft modifications',type='primary',disabled=not focus.strip(),width='stretch'):
+    if right.button('Draft modifications',type='primary',disabled=not focus.strip(),width='stretch',icon=':material/auto_fix_high:'):
+        context=drafting.basis(sid)
         with st.spinner('Drafting changes from the plan and evidence...'):
             new=run_safely(core.suggest_updates,sid,focus.strip())
-        if new: st.session_state[queue]=new+st.session_state[queue]
+        if new:
+            # Capture before the model call; never stamp a late response as fresh.
+            new=[item if '_generation' in item else {**item,**context} for item in new]
+            st.session_state[queue]=drafting.merge(st.session_state[queue],new)
         elif new==[]: st.info('No supported changes were identified. Add a more specific observation or review the missing evidence.')
     for question,answer,docs in st.session_state.get('modification_discussion_'+sid,[]):
         with st.expander('Discussion: '+question[:75],expanded=True):
@@ -102,7 +107,7 @@ def modifications(sid, teacher=''):
             st.caption('Discussion does not change the IEP. Draft modifications uses your focus and source evidence.')
     with st.expander('Explore accommodation options'):
         st.caption('Reference options for this discussion. Catalog evidence ratings are not independently verified.')
-        if st.button('Find relevant options',width='stretch'):
+        if st.button('Find relevant options',width='stretch',icon=':material/search:'):
             st.session_state['modification_options_'+sid]=run_safely(core.recommend_accommodations,sid,focus,k=15) or []
         options=st.session_state.get('modification_options_'+sid,[])
         if options:
@@ -112,13 +117,13 @@ def modifications(sid, teacher=''):
             frequency=st.text_input('When / how often',key='modification_frequency_'+sid,persist_state='session')
             amount=st.text_input('Amount or duration',key='modification_amount_'+sid,persist_state='session')
             location=st.text_input('Course or setting',key='modification_location_'+sid,persist_state='session')
-            if st.button('Add option to draft',disabled=not all(v.strip() for v in [frequency,amount,location]),width='stretch'):
+            if st.button('Add option to draft',disabled=not all(v.strip() for v in [frequency,amount,location]),width='stretch',icon=':material/add_circle:'):
                 suggestion=core.accommodation_to_suggestion(sid,chosen)
                 suggestion['payload'].update(frequency=frequency.strip(),amount=amount.strip(),location=location.strip())
                 suggestion['reason']='Reference option selected for team review. '+chosen.get('description','')
                 suggestion['teacher_note']=focus
                 suggestion['evidence']=I.evidence(sid)+[{'source':'Accommodation catalog','text':chosen.get('description',''),'catalog_id':chosen.get('id'),'evidence_verified':False}]
-                st.session_state[queue].insert(0,suggestion)
+                st.session_state[queue]=drafting.merge(st.session_state[queue],[suggestion])
                 st.success('Option added below. Edit its wording and send it for review.')
     if st.session_state[queue]: st.markdown('**Draft changes**')
     for i,suggestion in enumerate(list(st.session_state[queue])):
@@ -130,13 +135,23 @@ def modifications(sid, teacher=''):
             suggestion['suggested_text']=wording
             st.caption('Reason: '+suggestion.get('reason',''))
             if suggestion['action']=='add_service':
-                row=suggestion['payload'];st.caption(f"{row['frequency']} · {row['amount']} · {row['location']}")
-            if st.button('Send change to review',key=f'modification_submit_{sid}_{draft_id}',type='primary',disabled=not wording.strip(),width='stretch'):
+                row=suggestion['payload']
+                for field,label in [('frequency','Service: when / how often'),('amount','Service: amount or duration'),('location','Service: course or setting')]:
+                    row[field]=st.text_input(label,row.get(field,''),key=f'modification_{field}_{sid}_{draft_id}',persist_state='session')
+            if suggestion['action']=='add_goal':
+                suggestion['payload']['area']=st.text_input('Goal area',suggestion['payload'].get('area',''),key=f'modification_area_{sid}_{draft_id}',persist_state='session')
+            if st.button('Send change to review',key=f'modification_submit_{sid}_{draft_id}',type='primary',disabled=not wording.strip(),width='stretch',icon=':material/rate_review:'):
                 result=run_safely(core.apply_suggestion,sid,{**suggestion,'suggested_text':wording},teacher)
                 if result:
                     st.session_state[queue].pop(i);flash(result);D.navigate(sid,'Review')
-            if st.button('Discard option',key=f'modification_discard_{sid}_{draft_id}'):
+            if st.button('Discard option',key=f'modification_discard_{sid}_{draft_id}',icon=':material/close:'):
                 st.session_state[queue].pop(i);st.rerun()
+    if len(st.session_state[queue])>1:
+        st.caption('Send related changes together so the team can review and approve one complete draft.')
+        if st.button('Send all changes to review',icon=':material/playlist_add_check:',type='primary',width='stretch'):
+            result=run_safely(drafting.submit,sid,st.session_state[queue],teacher)
+            if result:
+                st.session_state[queue]=[];flash(result);D.navigate(sid,'Review')
 
 
 def form(student_id, teacher=""):
@@ -155,7 +170,7 @@ def form(student_id, teacher=""):
                 proposed=copy.deepcopy(iep)
                 for field,value in iep['extensions'].items():
                     proposed['extensions'][field]=U.typed_value(field.replace('_',' ').title(),value,'ext_form_'+sid+field)
-                if st.form_submit_button('Submit template fields for review'): save_form(proposed,'Template-specific information')
+                if st.form_submit_button('Submit template fields for review',icon=':material/crop_free:'): save_form(proposed,'Template-specific information')
     elif section=='Additional fields': st.info('This plan has no template-specific fields yet.')
     st.caption("Complete one section at a time and save it for review before switching sections. The plan changes only after approval.")
     k = f"{sid}_{vcount}"
@@ -177,7 +192,7 @@ def form(student_id, teacher=""):
             n["meta"]["case_manager"] = c3.text_input("Case manager (not printed)", iep["meta"]["case_manager"])
             for fk, label in S.PROFILE_FIELDS:
                 n["profile"][fk] = st.text_area(label, iep["profile"][fk])
-            if st.form_submit_button("Review student details"):
+            if st.form_submit_button("Review student details",icon=':material/person:'):
                 save_form(n, "Student information and profile")
 
     if section=='Special factors':
@@ -200,7 +215,7 @@ def form(student_id, teacher=""):
                 index=S.NONACADEMIC_OPTIONS.index(na["participation"]) if na["participation"] in S.NONACADEMIC_OPTIONS else 0)
             n["nonacademic"]["description"] = st.text_input("Describe supports / explanation", na["description"])
             n["progress_report_weeks"] = st.text_input("Progress reports every ___ weeks", iep["progress_report_weeks"])
-            if st.form_submit_button("Review special factors"):
+            if st.form_submit_button("Review special factors",icon=':material/rate_review:'):
                 save_form(n, "Special factors and transportation")
 
     if section=='Transition':
@@ -233,7 +248,7 @@ def form(student_id, teacher=""):
                 acts = st.text_area("Transition activities (one per line)", "\n".join(g["activities"]), key=f"ta_{ak}_{k}")
                 n["transition_goals"][ak]["activities"] = [x.strip() for x in acts.splitlines() if x.strip()]
                 n["transition_goals"][ak]["people"] = st.text_input("Person(s)/agency involved", g["people"], key=f"tp_{ak}_{k}")
-            if st.form_submit_button("Review transition changes"):
+            if st.form_submit_button("Review transition changes",icon=':material/rate_review:'):
                 save_form(n, "Transition")
 
     if section=='Annual goals':
@@ -259,7 +274,7 @@ def form(student_id, teacher=""):
                     keep.append(ng)
                 st.divider()
             add = st.checkbox("Add a new empty goal")
-            if st.form_submit_button("Review goal changes"):
+            if st.form_submit_button("Review goal changes",icon=':material/rate_review:'):
                 n["goals"] = keep + ([S.empty_goal() | {"mastery_date": iep["iep_to"]}] if add else [])
                 save_form(n, "Annual goals")
 
@@ -272,7 +287,7 @@ def form(student_id, teacher=""):
                 if ck != "special_education":
                     n["services"][ck]["needed"] = st.checkbox("Needed", iep["services"][ck]["needed"], key=f"sn_{ck}_{k}")
                 n["services"][ck]["rows"] = rows_editor(iep["services"][ck]["rows"], cols, f"sr_{ck}_{k}")
-            if st.form_submit_button("Review service changes"):
+            if st.form_submit_button("Review service changes",icon=':material/rate_review:'):
                 save_form(n, "Services")
 
     if section=='Placement & team':
@@ -297,7 +312,7 @@ def form(student_id, teacher=""):
             n["participants"] = rows_editor(iep["participants"], ["position", "name", "date"], f"pp_{k}")
             st.markdown("**Information from people not in attendance**")
             n["not_in_attendance"] = rows_editor(iep["not_in_attendance"], ["position", "name", "date"], f"pn_{k}")
-            if st.form_submit_button("Review placement & team changes"):
+            if st.form_submit_button("Review placement & team changes",icon=':material/rate_review:'):
                 save_form(n, "Rights, ESY, LRE and team")
 
 
@@ -318,9 +333,9 @@ def history(student_id, teacher=""):
         for j, v in enumerate(core.list_versions(sid)):
             with st.expander(f"{v['when']} — before: {v['note'] or 'change'}"):
                 version_pdf = U.P.render_document(v['document'], v['iep'])[0] if v.get('document') else export_pdf.build_pdf(v['iep'])
-                st.download_button("⬇️ PDF of this version", version_pdf,
-                                   file_name=f"IEP_{sid}_v{j}.pdf", key=f"vpdf_{sid}_{j}")
-                if st.button("↩️ Restore this version", key=f"restore_{sid}_{j}"):
+                st.download_button("PDF of this version", version_pdf,
+                                   file_name=f"IEP_{sid}_v{j}.pdf", key=f"vpdf_{sid}_{j}",icon=':material/download:')
+                if st.button("Restore this version", key=f"restore_{sid}_{j}",icon=':material/restore:'):
                     if run_safely(reviews.stage_change, sid, v['iep'], f"Restore version from {v['when']}", teacher, document=v.get('document')):
                         st.session_state['pending_student_section']='IEP'
                         st.session_state['pending_tool_'+sid]='Review'

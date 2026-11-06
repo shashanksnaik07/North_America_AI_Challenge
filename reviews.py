@@ -8,6 +8,7 @@ import iep_schema as S
 import local_store as store
 import ontology
 import pdf_workspace as pdf
+import workspace_state as W
 
 OPEN = {'pending', 'escalated'}
 ROLES = ['Case manager', 'Specialist', 'Administrator']
@@ -38,6 +39,7 @@ def findings(candidate, import_info=None):
         if import_info.get('error'): result.append('Extraction failed: ' + import_info['error'])
     return result
 
+@W.guarded
 def stage_import(candidate, filename, data, template_id, actor, import_info=None, target_sid=None):
     import core
     candidate = S.normalize(candidate)
@@ -66,13 +68,24 @@ def stage_import(candidate, filename, data, template_id, actor, import_info=None
     store.put('review', item['id'], item)
     return item['id']
 
-def stage_change(sid, candidate, title, actor='', evidence=(), document=None):
+@W.guarded
+def stage_change(sid, candidate, title, actor='', evidence=(), document=None, expected_base_hash=None):
     import core
     base = core.get_iep(sid); candidate = S.normalize(candidate)
+    if expected_base_hash and fingerprint(base) != expected_base_hash:
+        raise ValueError('The IEP changed while this draft was being prepared. Reload and try again.')
     if base == candidate and document is None: raise ValueError('There are no changes to review.')
+    document = copy.deepcopy(document or pdf.ensure_document(sid, base))
+    jsonschema.validate(candidate, ontology.template_schema(document.get('template_id', 'custom')))
+    for existing in list_reviews(sid, open_only=True):
+        if existing['base_hash'] == fingerprint(base) and existing['candidate'] == candidate:
+            if existing.get('document_hash') == fingerprint(document) or existing['document'] == document:
+                raise ValueError('These changes are already saved in Review. Open that draft to continue.')
+    document = pdf.prepare_draft_document(document, base, candidate)
+    pdf.render_document(document, candidate)
     item = {'id': uuid.uuid4().hex, 'kind': 'change', 'student_id': sid, 'title': title,
             'created': store.now(), 'base': base, 'base_hash': fingerprint(base), 'candidate': candidate,
-            'document': copy.deepcopy(document or pdf.ensure_document(sid, base)),
+            'document': document,
             'document_hash': fingerprint(pdf.student_document(sid)), 'findings': [],
             'status': 'pending', 'required_role': 'Case manager', 'assignee': '', 'events': [],
             'revision': 1, 'evidence': copy.deepcopy(list(evidence))}
@@ -88,6 +101,9 @@ def update_candidate(review_id, candidate, actor, revision, document=None):
         template_id = (document or item.get('document') or {}).get('template_id', item.get('template_id', 'custom'))
         schema = ontology.template_schema(template_id, db)
         jsonschema.validate(candidate, schema)
+        if item['kind']=='change':
+            document=pdf.prepare_draft_document(document or item['document'],item['base'],candidate)
+            pdf.render_document(document,candidate)
         item['candidate'] = copy.deepcopy(candidate)
         if document is not None: item['document'] = document
         item['revision'] += 1
@@ -108,12 +124,13 @@ def escalate(review_id, actor, reason, assignee, role='Specialist'):
         _event(item, 'escalated', actor, reason)
         store.put('review', review_id, item, db)
 
-def decide(review_id, decision, actor, role, confirmed=False, note='', revision=None):
+def decide(review_id, decision, actor, role, confirmed=False, note='', revision=None, expected_generation=None):
     import core
     if decision not in ('approved', 'rejected'): raise ValueError('Unknown decision.')
     if not actor.strip(): raise ValueError('Enter the reviewer name.')
     if role not in ROLES: raise ValueError('Choose a review role.')
     with store.transaction() as db:
+        W.check_generation(expected_generation)
         item = store.get('review', review_id, con=db)
         _editable(item, revision if revision is not None else item['revision'])
         if item['status'] == 'escalated' and role not in (item['required_role'], 'Administrator'):

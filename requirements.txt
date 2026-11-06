@@ -11,3 +11,4 @@ pytesseract>=0.3
 PyJWT[crypto]>=2.10,<3
 jsonschema>=4.23
 requests>=2.32
+filelock>=3.16,<5

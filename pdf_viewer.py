@@ -78,9 +78,11 @@ def review_redlines(document, before, after):
 def continuation_notice(document):
     """Explain generated supplement pages separately from original NASET pages."""
     native = document.get('native_template_pages')
+    source_pages = native or document.get('source_page_count')
     total = len(document.get('page_labels', []))
-    if native and total > native:
-        with st.expander(f'About the {total-native} app-added pages'):
-            st.write(f'Pages 1–{native} use the original NASET form. Pages {native+1}–{total} were added by this app for '
+    if source_pages and total > source_pages:
+        with st.expander(f'About the {total-source_pages} app-added pages'):
+            origin='original NASET form' if native else 'saved source document'
+            st.write(f'Pages 1–{source_pages} use the {origin}. Pages {source_pages+1}–{total} were added by this app for '
                      'text overflow and plan fields that are not yet mapped to a box on the original form. '
-                     'They are not pages from the NASET template.')
+                     'They are separate from the source pages.')

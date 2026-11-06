@@ -211,6 +211,9 @@ def test_catalog_option_joins_the_same_draft_queue(workspace,record,original_pdf
     assert suggestion['payload']['frequency']=='During long independent tasks'
     assert suggestion['payload']['amount']=='Three minutes'
     click(app,'Add option to draft')
+    assert len(app.session_state['suggestions_'+sid])==1  # duplicate clicks do not add duplicate services
+    next(t for t in app.text_input if t.label=='Amount or duration').set_value('Five minutes').run()
+    click(app,'Add option to draft')
     [t for t in app.text_area if t.label=='Proposed wording'][1].set_value('Keep this edited break plan.').run()
     next(b for b in app.button if b.label=='Discard option').click().run()
     assert next(t for t in app.text_area if t.label=='Proposed wording').value=='Keep this edited break plan.'
@@ -241,3 +244,37 @@ def test_grades_show_assignment_instructor_course_and_filter(platform,record,ori
     assert len(grades)==1 and grades.iloc[0]['Course']=='Algebra I'
     click(app,'Use these reports to draft an update')
     assert app.session_state['active_tool_'+sid]=='Modifications'
+
+
+def test_batch_draft_submits_once_and_removes_queue(workspace,record,original_pdf,monkeypatch):
+    sid,app=ready(record,original_pdf)
+    monkeypatch.setattr(core,'suggest_updates',lambda student,note:[
+        core._make_change(record,'grade','10','Course evidence','teacher note'),
+        core._make_change(record,'profile.needs','A private checkpoint during independent tasks.','Course evidence','teacher note')])
+    click(app,'Suggested modifications')
+    next(t for t in app.text_area if t.label=='Question or observation').set_value('Review the plan').run()
+    click(app,'Draft modifications');click(app,'Draft modifications')
+    assert len(app.session_state['suggestions_'+sid])==2
+    click(app,'Send all changes to review')
+    assert len(reviews.list_reviews(sid))==1
+    assert not app.session_state['suggestions_'+sid]
+    assert core.get_iep(sid)==record
+
+
+def test_workspace_reset_clears_take_data_and_session_confirmations(workspace,record,original_pdf):
+    import demo_snapshots as snapshots
+    sid,app=ready(record,original_pdf)
+    saved=snapshots.capture('Demo start')
+    changed=core.get_iep(sid);changed['grade']='10';core.save_iep(sid,changed)
+    added=core.create_student(core.blank_iep('Student from take one'))
+    app.session_state['suggestions_'+sid]=[{'suggested_text':'Unsaved take-one draft'}]
+    app.session_state['reviewer_name']='Take-one reviewer'
+    app.session_state['setup_section']='Demo & reset';app.run()
+    assert not app.exception,app.exception
+    assert next(b for b in app.button if b.label=='Reset for next take').disabled
+    next(c for c in app.checkbox if c.label=='Reset all application data to this snapshot').check().run()
+    click(app,'Reset for next take')
+    assert core.get_iep(sid)==record and added not in core.list_students()
+    assert 'suggestions_'+sid not in app.session_state
+    assert 'reviewer_name' not in app.session_state
+    assert not app.exception

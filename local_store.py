@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import sqlite3
+import workspace_state as W
 
 DATA_DIR = Path(os.environ.get('IEP_DATA_DIR', Path(__file__).parent / 'data'))
 
@@ -13,6 +14,12 @@ def now():
 
 @contextlib.contextmanager
 def transaction():
+    with W.guard(), _transaction() as con:
+        yield con
+
+
+@contextlib.contextmanager
+def _transaction():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     con = sqlite3.connect(DATA_DIR / 'workspace.sqlite3', timeout=30)
     try:
@@ -45,6 +52,7 @@ def all_records(kind, con=None):
             return all_records(kind, db)
     return [json.loads(r[0]) for r in con.execute('SELECT body FROM records WHERE kind=? ORDER BY id', (kind,))]
 
+@W.guarded
 def atomic_json(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
