@@ -14,6 +14,7 @@ import integrations as I
 import local_store as store
 import ontology as O
 import pdf_workspace as P
+import pdf_viewer as V
 import reviews as R
 
 region = components.declare_component('iep_pdf_region', path=str(Path(__file__).parent / 'components' / 'pdf_region'))
@@ -68,23 +69,24 @@ def show_pdf_diff(item, key):
     document = item.get('document')
     if not document:
         st.info('This source is text. The equivalent form diff is available below.'); return
-    source = P.source_bytes(document); page_count = len(P.inspect_pdf(source))
-    page = st.number_input('PDF page', min_value=1, max_value=page_count, value=1, key=key+'_page') - 1
+    source = P.source_bytes(document)
     delta = P.changes(item['base'], item['candidate'])
-    overlays = [b for d in delta for b in document['bindings'].get(P.binding_key(document, d['path']), [])]
-    left, right = st.columns(2)
-    before = source if item['kind'] == 'import' else P.render_document(document, item['base'], False)[0]
-    left.markdown('**Before / source — red marks reviewed regions**')
-    left.image(P.page_image(before, page, overlays, 'red'), width='stretch')
+    version = st.segmented_control('Compare PDF', ['Changes','Proposed','Current / source'], default='Changes', required=True, key=key+'_compare_redline')
+    record = item['candidate'] if version=='Proposed' else None if item['kind']=='import' else item['base']
+    redlines = V.review_redlines(document,item['base'],item['candidate']) if version=='Changes' else []
+    st.caption('Red strike-through: removed · Green underline: added · Expand a marked field for the full change.' if version=='Changes' else version)
     try:
-        after, unmapped = P.render_document(document, item['candidate'], False)
-        right.markdown('**Proposed — green marks changed regions**')
-        right.image(P.page_image(after, page, overlays, 'green'), width='stretch')
+        content_id,pages = V.document_preview(source,document,record,append_unmapped=False)
+        V.continuation_notice(document)
+        V.viewer(pages=pages,content_id=content_id,document_key='review_'+item['id']+document['sha256'][:8],
+                 redlines=redlines,mode='read',zoom=100,viewport_height=710,
+                 highlighted_fields=[] if redlines else list({P.binding_key(document,d['path']) for d in delta}-{None}),
+                 color='red' if version=='Current / source' else 'green',key=key+'_pdf',default=None)
         missing = [d['path'] for d in delta if not P.binding_key(document, d['path'])]
         if missing: st.caption(f'{len(missing)} changed fields have no PDF region. Review them in the form diff; approved changes to unbound source fields appear in an addendum.')
         full, _ = P.render_document(document, item['candidate'])
         st.download_button('Download proposed original-layout PDF', full, 'proposed-iep.pdf', 'application/pdf', key=key+'_download')
-    except ValueError as exc: right.error(str(exc))
+    except ValueError as exc: st.error(str(exc))
 
 def import_controls(actor):
     st.caption('1. Choose a file → 2. Check the extracted information → 3. Approve the import')

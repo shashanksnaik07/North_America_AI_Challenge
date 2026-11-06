@@ -25,6 +25,13 @@
     <p id="instructions">Scroll to read. Use Page Up / Page Down or enter a page number to jump.</p>
     <span id="announcement" class="sr-only" aria-live="polite"></span>
   </section>
+  <dialog id="change-dialog" aria-labelledby="change-title">
+    <div class="change-heading"><h2 id="change-title">Change</h2><button id="close-change" type="button" aria-label="Close full change">×</button></div>
+    <p id="change-location"></p>
+    <p class="change-legend"><del>Removed</del> <ins>Added</ins></p>
+    <div id="change-content"></div>
+    <button id="continuation-link" type="button" hidden>Go to continuation page</button>
+  </dialog>
   <script src="viewer.js"></script>
 </body>
 </html>

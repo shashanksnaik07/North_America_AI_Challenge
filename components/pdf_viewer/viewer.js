@@ -6,6 +6,9 @@ const pageInput = document.getElementById('page-number');
 const buttons = Object.fromEntries(['first', 'previous', 'next', 'last'].map(id => [id, document.getElementById(id)]));
 const svgNS = 'http://www.w3.org/2000/svg';
 let args = {}, pageElements = [], currentPage = 0, contentId = null, command = null, drag = null, scrollFrame = null, editingPage = false;
+let redlineElements = [];
+const changeDialog = document.getElementById('change-dialog');
+document.getElementById('close-change').onclick = () => changeDialog.close();
 
 function send(type, extra = {}) { parent.postMessage({isStreamlitMessage: true, type, ...extra}, '*'); }
 function emit(value) { send('streamlit:setComponentValue', {value: {...value, event: crypto.randomUUID()}, dataType: 'json'}); }
@@ -69,6 +72,82 @@ function rectangle(svg, bounds, stroke, fill, width = 1) {
   for (const [key, value] of Object.entries({x, y, width: right - x, height: bottom - y, stroke, fill, 'stroke-width': width, 'vector-effect': 'non-scaling-stroke'})) rect.setAttribute(key, value);
   svg.appendChild(rect); return rect;
 }
+function tokenText(element, tokens) {
+  element.replaceChildren();
+  for (const [index, token] of tokens.entries()) {
+    if (index) element.appendChild(document.createTextNode(' '));
+    const part = document.createElement(token.kind === 'delete' ? 'del' : token.kind === 'insert' ? 'ins' : 'span');
+    part.textContent = token.text; // Record values must never become HTML.
+    if (token.kind !== 'equal') part.title = token.kind === 'delete' ? 'Removed' : 'Added';
+    element.appendChild(part);
+  }
+}
+function expandChange(change) {
+  document.getElementById('change-title').textContent = change.label;
+  document.getElementById('change-location').textContent = `Page ${change.page + 1} · Full change in this field`;
+  tokenText(document.getElementById('change-content'), change.tokens);
+  const link = document.getElementById('continuation-link');
+  link.hidden = !change.continuation_page;
+  link.textContent = `Go to full field on continuation page ${change.continuation_page}`;
+  link.onclick = () => { changeDialog.close(); goToPage(change.continuation_page - 1); };
+  changeDialog.showModal();
+}
+function fitRedlines() {
+  const marginPositions = new Map();
+  for (const {box, text, button, connector, change, sheet, page} of [...redlineElements].sort((a, b) => a.change.page - b.change.page || a.change.rect[1] - b.change.rect[1])) {
+    const scale = sheet.clientWidth / page.width;
+    if (!scale) continue;
+    let display = 'full';
+    function fits(tokens) {
+      tokenText(text, tokens);
+      for (let size = 10; size >= 7; size -= .5) {
+        text.style.fontSize = `${size * scale}px`;
+        if (text.scrollHeight <= text.clientHeight + 1 && text.scrollWidth <= text.clientWidth + 1) return true;
+      }
+      return false;
+    }
+    if (!fits(change.tokens)) {
+      display = 'changes-only';
+      const changed = change.tokens.filter(token => token.kind !== 'equal');
+      if (!fits(changed)) {
+        display = 'excerpt';
+        let fitted = false;
+        for (let count = 5; count >= 1; count--) {
+          const excerpt = changed.map(token => ({...token, text: token.text.split(/\s+/).slice(0, count).join(' ') + (token.text.split(/\s+/).length > count ? '…' : '')}));
+          if (fits(excerpt)) { fitted = true; break; }
+        }
+        if (!fitted) { display = 'summary'; fits(changed.map(token => ({kind: token.kind, text: token.kind === 'delete' ? '−' : '+'}))); }
+      }
+    }
+    box.dataset.display = display;
+    button.textContent = display === 'full' ? '↗' : '…';
+    button.classList.toggle('abridged', display !== 'full');
+    button.title = display === 'full' ? 'Expand full change' : 'Preview shortened to fit this box. Expand to read the full change.';
+    button.setAttribute('aria-label', `${display === 'full' ? 'Expand change' : 'Expand full change (shortened preview)'}: ${change.label}`);
+    // Put controls in the right page margin, away from neighboring form labels.
+    const marginTop = Math.min(sheet.clientHeight - 24, Math.max(change.rect[1] * scale, (marginPositions.get(sheet) ?? -28) + 28));
+    marginPositions.set(sheet, marginTop);
+    button.style.left = `${sheet.clientWidth - change.rect[0] * scale - 26}px`;
+    button.style.top = `${marginTop - change.rect[1] * scale}px`;
+    connector.style.width = `${Math.max(0, sheet.clientWidth - change.rect[2] * scale - 26)}px`;
+  }
+}
+function paintRedlines() {
+  redlineElements = [];
+  for (const element of pageElements) element.querySelectorAll('.redline-box').forEach(box => box.remove());
+  for (const change of args.redlines || []) {
+    const page = args.pages[change.page], sheet = pageElements[change.page]?.querySelector('.sheet');
+    if (!sheet) continue;
+    const [x, y, right, bottom] = change.rect;
+    const box = document.createElement('div'); box.className = 'redline-box'; box.setAttribute('aria-label', `Change: ${change.label}`);
+    Object.assign(box.style, {left: `${x / page.width * 100}%`, top: `${y / page.height * 100}%`, width: `${(right - x) / page.width * 100}%`, height: `${(bottom - y) / page.height * 100}%`});
+    const text = document.createElement('div'); text.className = 'redline-content';
+    const connector = document.createElement('span'); connector.className = 'redline-connector'; connector.setAttribute('aria-hidden', 'true');
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'expand-change'; button.onclick = () => expandChange(change);
+    box.append(text, connector, button); sheet.appendChild(box); redlineElements.push({box, text, button, connector, change, sheet, page});
+  }
+  fitRedlines();
+}
 function paintOverlays() {
   const highlighted = new Set(args.highlighted_fields || []);
   pageElements.forEach((element, index) => {
@@ -80,6 +159,7 @@ function paintOverlays() {
     }
     if (args.selection && args.selection.page === index && args.mode === 'map') rectangle(svg, args.selection.rect, '#15803d', '#16a34a22', 2);
   });
+  paintRedlines();
 }
 function point(event, sheet, page) {
   const bounds = sheet.getBoundingClientRect();
@@ -120,7 +200,7 @@ function rebuild() {
   pagesRoot.replaceChildren();
   pageElements = args.pages.map((page, index) => {
     const element = document.createElement('section'); element.className = 'pdf-page'; element.setAttribute('aria-label', `Page ${index + 1} of ${args.pages.length}`);
-    const label = document.createElement('p'); label.className = 'page-label'; label.textContent = `Page ${index + 1} · ${page.label || 'IEP'}`;
+    const label = document.createElement('p'); label.className = 'page-label'; label.textContent = `Page ${index + 1} · ${(page.label || 'IEP').replace('Continuation / additional plan details', 'App-added continuation / additional plan details')}`;
     const sheet = document.createElement('div'); sheet.className = 'sheet'; sheet.style.aspectRatio = `${page.width} / ${page.height}`;
     const img = document.createElement('img'); img.alt = `IEP PDF page ${index + 1}. Field text is also available in Form view.`;
     img.loading = 'lazy'; img.decoding = 'async'; img.width = Math.round(page.width); img.height = Math.round(page.height); img.src = 'data:image/png;base64,' + page.image;
@@ -140,6 +220,7 @@ window.addEventListener('message', event => {
   if (event.source !== parent || event.data.type !== 'streamlit:render') return;
   const next = event.data.args;
   if (!next.pages?.length) return;
+  if (changeDialog.open) changeDialog.close();
   const switchedDocument = args.document_key !== next.document_key;
   if (contentId) remember();
   args = next;
@@ -162,6 +243,6 @@ window.addEventListener('message', event => {
 let resizeFrame;
 new ResizeObserver(() => {
   cancelAnimationFrame(resizeFrame);
-  resizeFrame = requestAnimationFrame(() => { if (pageElements.length) restore(readPosition()); frameHeight(); });
+  resizeFrame = requestAnimationFrame(() => { if (pageElements.length) restore(readPosition()); fitRedlines(); frameHeight(); });
 }).observe(viewport);
 send('streamlit:componentReady', {apiVersion: 1}); frameHeight();

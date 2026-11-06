@@ -42,6 +42,15 @@ The original PDFs, review rules, AI services and integration adapters are unchan
   and a bounded preview cache limit repeat rendering; long documents still need
   their page images prepared on first open. Field selection, mapping and review
   overlays work on every page, including rotated pages and continuation pages.
+* Default PDF comparison to **Changes**: removed words appear struck through in
+  red and additions underlined in green, together over their bound original-form
+  field. Full changes can be expanded inside the viewer. If the combined text
+  will not fit the original box at a readable size, show a shortened preview with
+  a clearly marked expansion control; do not discard the full diff. Clean Proposed
+  and Current / source views remain available. Downloads remain clean IEPs.
+* Identify app-added continuation pages and explain their origin once per document:
+  they contain overflow and fields that the template mapping has not yet placed,
+  and are separate from the original NASET pages.
 * Render only the active main tab, preventing hidden connection or template
   controls from doing work and distracting from the current task.
 

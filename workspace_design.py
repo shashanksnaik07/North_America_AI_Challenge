@@ -408,21 +408,26 @@ def acrobat_workspace(sid,record,actor,role):
                         st.markdown('**'+label(d['path'])+'**');st.markdown(R.diff_html(d['before'],d['after']),unsafe_allow_html=True)
                 else: tools.form(sid,actor)
                 return
-            highlighted_fields=[];color='green'
+            highlighted_fields=[];color='green';redlines=[]
             if item:
-                version=st.segmented_control('Compare PDF',['Proposed','Current / source'],default='Proposed',required=True,key='compare_'+item['id'])
+                version=st.segmented_control('Compare PDF',['Changes','Proposed','Current / source'],default='Changes',required=True,key='compare_redline_'+item['id'])
                 delta=P.changes(item['base'],item['candidate'])
                 highlighted_fields=list({P.binding_key(document,d['path']) for d in delta}-{None})
-                if version=='Current / source':
+                if version=='Changes':
+                    preview_record=None if item['kind']=='import' else item['base']
+                    redlines=V.review_redlines(document,item['base'],item['candidate'])
+                elif version=='Current / source':
                     preview_record=None if item['kind']=='import' else item['base'];color='red'
                 else:
                     preview_record=item['candidate']
-                st.caption('Green: proposed changes' if color=='green' else 'Red: current/source locations')
+                st.caption('Red strike-through: removed · Green underline: added · Expand a marked field for the full change.'
+                           if version=='Changes' else 'Green: proposed changes' if color=='green' else 'Red: current/source locations')
                 missing=sum(not P.binding_key(document,d['path']) for d in delta)
                 if missing: st.warning(f'{missing} changed fields need a PDF location. Check them in Form view; downloads include them on added pages.')
             else:
                 preview_record=record
             if document['origin']=='generated baseline': st.caption('Preview created from the saved IEP. Imported PDFs keep their original layout.')
+            V.continuation_notice(document)
             show_fields=tool=='Edit'
             selected=st.session_state.get('selected_region_'+sid)
             mode='map' if tool=='Edit' and st.session_state.get('mapping_'+sid) else 'select' if tool=='Edit' else 'read'
@@ -433,7 +438,8 @@ def acrobat_workspace(sid,record,actor,role):
             result=V.viewer(pages=pages,content_id=content_id,document_key=scope,
                 initial_page=document.get('default_page',0),navigation=st.session_state.get(navigation_key),
                 show_fields=show_fields,active_field=field,zoom=zoom,viewport_height=710,
-                highlighted_fields=highlighted_fields,color=color,selection=selected if tool=='Edit' else None,
+                highlighted_fields=[] if redlines else highlighted_fields,color=color,redlines=redlines,
+                selection=selected if tool=='Edit' else None,
                 mode=mode,key='document_canvas_'+scope,default=None)
             if result and result['event']!=st.session_state.get('handled_canvas_event_'+sid):
                 st.session_state['handled_canvas_event_'+sid]=result['event']

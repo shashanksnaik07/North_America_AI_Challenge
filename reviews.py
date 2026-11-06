@@ -148,14 +148,26 @@ def decide(review_id, decision, actor, role, confirmed=False, note='', revision=
         store.put('review', review_id, item, db)
     return item.get('student_id')
 
-def diff_html(before, after):
-    """Escaped word-level insertions/deletions, with labels in addition to colors."""
+def diff_tokens(before, after):
+    """Word-level changes shared by form and original-document review views."""
     import difflib
-    from html import escape
-    old, new = ontology.text(before).split(), ontology.text(after).split()
+    old = (ontology.text(before) if before is not None else '').split()
+    new = (ontology.text(after) if after is not None else '').split()
     parts = []
     for kind, a, b, c, d in difflib.SequenceMatcher(a=old, b=new, autojunk=False).get_opcodes():
-        if kind == 'equal': parts.append(escape(' '.join(old[a:b])))
-        if kind in ('delete', 'replace'): parts.append('<del style="background:#fee2e2;color:#991b1b">' + escape(' '.join(old[a:b])) + '</del>')
-        if kind in ('insert', 'replace'): parts.append('<ins style="background:#dcfce7;color:#166534;text-decoration:none">' + escape(' '.join(new[c:d])) + '</ins>')
+        if kind == 'equal': parts.append({'kind':'equal','text':' '.join(old[a:b])})
+        if kind in ('delete', 'replace'): parts.append({'kind':'delete','text':' '.join(old[a:b])})
+        if kind in ('insert', 'replace'): parts.append({'kind':'insert','text':' '.join(new[c:d])})
+    return parts
+
+
+def diff_html(before, after):
+    """Escaped word-level insertions/deletions, with labels in addition to colors."""
+    from html import escape
+    parts = []
+    for token in diff_tokens(before, after):
+        text = escape(token['text'])
+        if token['kind'] == 'delete': text = '<del style="background:#fee2e2;color:#991b1b">'+text+'</del>'
+        elif token['kind'] == 'insert': text = '<ins style="background:#dcfce7;color:#166534;text-decoration:underline">'+text+'</ins>'
+        parts.append(text)
     return '<div style="line-height:1.9;padding:12px;border:1px solid #cbd5e1;border-radius:8px">' + ' '.join(parts) + '</div>'
