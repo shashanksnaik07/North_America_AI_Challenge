@@ -88,6 +88,7 @@ def save_form(new_iep: dict, section: str, sid: str, teacher: str, draft_revisio
 def modifications(sid, teacher=''):
     """Evidence-first drafting, optional discussion, and one human-review queue."""
     import integrations as I
+    import workspace_design as D
     queue='suggestions_'+sid
     st.session_state.setdefault(queue,[])
     st.caption('Review suggested changes based on the current IEP, course feedback and team reports.')

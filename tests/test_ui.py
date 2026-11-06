@@ -167,6 +167,22 @@ def test_connections_from_caseload_identify_the_target_student(workspace,record)
     assert next(s for s in app.selectbox if s.label=='Student').value==sid
 
 
+def test_saved_lms_evidence_renders_in_suggested_modifications(workspace,record,original_pdf,monkeypatch):
+    import integrations as I
+    sid,app=ready(record,original_pdf)
+    comment='Used the written next step to resume independent mathematics work.'
+    monkeypatch.setattr(I,'evidence',lambda student:[{
+        'kind':'lti_result','course':'Mathematics','reporter':'Emily Harper','reporter_role':'Teacher',
+        'source':'LMS assignment','label':'Multi-step problem solving','score':72,'maximum':100,
+        'observation':comment,'graded_at':'2026-10-30T12:00:00Z'}])
+    click(app,'Suggested modifications')
+    assert any(comment==m.value for m in app.markdown)
+    assert any('Emily Harper' in m.value and 'Mathematics' in m.value for m in app.markdown)
+    assert any('72 / 100' in m.value for m in app.markdown)
+    assert not next(b for b in app.button if b.label=='Draft modifications').disabled
+    assert core.get_iep(sid)==record and not reviews.list_reviews(sid)
+
+
 def test_single_modification_workflow_discussion_to_review(workspace,record,original_pdf,monkeypatch):
     monkeypatch.setattr(core,'list_supporting_docs',lambda sid:['Progress observation.txt'])
     sid,app=ready(record,original_pdf)
